@@ -23,7 +23,7 @@ flowchart LR
 ## Event Flow
 
 1. `Collector` reads recent changes from Wikipedia and emits `RawEditEvent`.
-2. `TopicMatcher` checks manual seeds, exact titles, include/exclude title keywords, and stored `topic_articles`.
+2. `TopicMatcher` checks manual seeds, exact titles, include/exclude title keywords, stored `topic_articles`, and cached Wikipedia page categories.
 3. Confirmed/high-confidence matches are emitted as `TopicMatchedEditEvent`.
 4. Candidate/low-confidence matches are stored as `Candidate` memberships and may be reviewed manually later.
 5. `ConflictDetector` fetches minimal revision metadata: ids, parent id, sha1, user, timestamp, comment, tags, size.
@@ -49,4 +49,3 @@ flowchart LR
 - `conflict-topics`
 - `conflict-topic:{topicId}`
 - `conflict-article:{topicId}:{pageId}`
-

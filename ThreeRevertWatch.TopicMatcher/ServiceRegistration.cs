@@ -3,6 +3,7 @@ using ThreeRevertWatch.Infrastructure.Kafka;
 using ThreeRevertWatch.Infrastructure.Persistence;
 using ThreeRevertWatch.TopicMatcher.Configuration;
 using ThreeRevertWatch.TopicMatcher.Matching;
+using ThreeRevertWatch.TopicMatcher.Metadata;
 using ThreeRevertWatch.TopicMatcher.Persistence;
 using ThreeRevertWatch.TopicMatcher.Workers;
 
@@ -19,7 +20,11 @@ public static class ServiceRegistration
             .Bind(configuration.GetSection(ConflictTopicsOptions.SectionName))
             .Validate(options => options.Topics.Count > 0, "At least one conflict topic is required")
             .ValidateOnStart();
+        services.AddOptions<PageMetadataOptions>()
+            .Bind(configuration.GetSection(PageMetadataOptions.SectionName));
         services.AddSingleton<ITopicMatcher, RuleBasedTopicMatcher>();
+        services.AddHttpClient<IWikiPageMetadataClient, WikipediaPageMetadataClient>(client =>
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("ThreeRevertWatch/1.0 (local LAN monitoring; contact: admin@example.invalid)"));
         services.AddSingleton<ITopicArticleRepository, PostgresTopicArticleRepository>();
         services.AddSingleton<IConflictTopicSeeder, PostgresConflictTopicSeeder>();
         services.AddHostedService<TopicMatcherWorker>();

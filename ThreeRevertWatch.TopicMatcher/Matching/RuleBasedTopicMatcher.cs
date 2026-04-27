@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using ThreeRevertWatch.Contracts;
 using ThreeRevertWatch.TopicMatcher.Configuration;
+using ThreeRevertWatch.TopicMatcher.Metadata;
 using ThreeRevertWatch.TopicMatcher.Persistence;
 
 namespace ThreeRevertWatch.TopicMatcher.Matching;
@@ -9,16 +10,25 @@ public sealed class RuleBasedTopicMatcher : ITopicMatcher
 {
     private readonly ConflictTopicsOptions _options;
     private readonly ITopicArticleRepository _repository;
+    private readonly IWikiPageMetadataClient _metadataClient;
+    private readonly ILogger<RuleBasedTopicMatcher> _logger;
 
-    public RuleBasedTopicMatcher(IOptions<ConflictTopicsOptions> options, ITopicArticleRepository repository)
+    public RuleBasedTopicMatcher(
+        IOptions<ConflictTopicsOptions> options,
+        ITopicArticleRepository repository,
+        IWikiPageMetadataClient metadataClient,
+        ILogger<RuleBasedTopicMatcher> logger)
     {
         _options = options.Value;
         _repository = repository;
+        _metadataClient = metadataClient;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<TopicMatch>> MatchAsync(RawEditEvent edit, CancellationToken cancellationToken)
     {
         var matches = new List<TopicMatch>();
+        Task<WikiPageMetadata>? metadataTask = null;
 
         foreach (var topic in _options.Topics.Where(t => t.IsActive && WikiMatches(t.Wiki, edit.Wiki)))
         {
@@ -64,6 +74,53 @@ public sealed class RuleBasedTopicMatcher : ITopicMatcher
                 reasons.AddRange(keywordHits.Select(keyword => $"title keyword: {keyword}"));
             }
 
+            if (ShouldUseMetadata(topic, score))
+            {
+                metadataTask ??= _metadataClient.GetAsync(edit.Wiki, edit.PageId, edit.Title, cancellationToken);
+                var metadata = await GetMetadataAsync(edit, metadataTask);
+                if (ContainsAnyCategory(metadata.Categories, topic.ExcludeCategories)
+                    || ContainsAnyCategory(metadata.Categories, topic.ExcludeCategoryKeywords))
+                {
+                    _logger.LogInformation(
+                        "Metric={Metric} TopicId={TopicId} Wiki={Wiki} PageId={PageId} RevisionId={RevisionId} Reason={Reason}",
+                        "topic_matcher_metadata_rejected",
+                        topic.Id,
+                        edit.Wiki,
+                        edit.PageId,
+                        edit.RevisionId,
+                        "excluded category");
+                    continue;
+                }
+
+                var exactCategoryHits = topic.IncludeCategories
+                    .SelectMany(includeCategory => metadata.Categories
+                        .Where(category => CategoryEquals(category, includeCategory))
+                        .Select(category => (Rule: includeCategory, Category: category)))
+                    .DistinctBy(hit => hit.Category, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (exactCategoryHits.Count > 0)
+                {
+                    score = Math.Max(score, 0.9);
+                    reasons.AddRange(exactCategoryHits.Select(hit => $"category: {DisplayCategory(hit.Category)}"));
+                }
+
+                var categoryKeywordHits = topic.CategoryKeywords
+                    .SelectMany(keyword => metadata.Categories
+                        .Where(category => ContainsCategory(category, keyword))
+                        .Select(category => (Keyword: keyword, Category: category)))
+                    .DistinctBy(hit => $"{hit.Keyword}:{hit.Category}", StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (categoryKeywordHits.Count > 0)
+                {
+                    var categoryScore = Math.Min(0.55 + categoryKeywordHits.Count * 0.1, 0.8);
+                    score = Math.Max(score, categoryScore);
+                    reasons.AddRange(categoryKeywordHits
+                        .Select(hit => $"category keyword: {hit.Keyword} ({DisplayCategory(hit.Category)})"));
+                }
+            }
+
             if (score >= _options.CandidateThreshold)
             {
                 var status = score >= _options.ConfirmedThreshold
@@ -83,6 +140,33 @@ public sealed class RuleBasedTopicMatcher : ITopicMatcher
         return matches;
     }
 
+    private async Task<WikiPageMetadata> GetMetadataAsync(
+        RawEditEvent edit,
+        Task<WikiPageMetadata> metadataTask)
+    {
+        try
+        {
+            return await metadataTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Page metadata lookup failed. Wiki={Wiki} PageId={PageId} RevisionId={RevisionId}",
+                edit.Wiki,
+                edit.PageId,
+                edit.RevisionId);
+            return new WikiPageMetadata(edit.Wiki, edit.PageId, edit.Title, []);
+        }
+    }
+
+    private static bool ShouldUseMetadata(ConflictTopicConfig topic, double currentScore)
+        => currentScore < 0.95
+           && (topic.CategoryKeywords.Count > 0
+               || topic.IncludeCategories.Count > 0
+               || topic.ExcludeCategories.Count > 0
+               || topic.ExcludeCategoryKeywords.Count > 0);
+
     private static bool WikiMatches(string configuredWiki, string editWiki)
         => string.Equals(configuredWiki, editWiki, StringComparison.OrdinalIgnoreCase);
 
@@ -96,7 +180,25 @@ public sealed class RuleBasedTopicMatcher : ITopicMatcher
         => !string.IsNullOrWhiteSpace(keyword)
            && NormalizeTitle(title).Contains(NormalizeTitle(keyword), StringComparison.OrdinalIgnoreCase);
 
+    private static bool ContainsAnyCategory(IReadOnlyList<string> categories, IEnumerable<string> rules)
+        => rules.Any(rule => categories.Any(category => ContainsCategory(category, rule)));
+
+    private static bool ContainsCategory(string category, string keyword)
+        => !string.IsNullOrWhiteSpace(keyword)
+           && NormalizeCategory(category).Contains(NormalizeCategory(keyword), StringComparison.OrdinalIgnoreCase);
+
+    private static bool CategoryEquals(string category, string expected)
+        => string.Equals(NormalizeCategory(category), NormalizeCategory(expected), StringComparison.OrdinalIgnoreCase);
+
     private static string NormalizeTitle(string title)
         => title.Replace('_', ' ').Trim();
-}
 
+    private static string NormalizeCategory(string category)
+        => NormalizeTitle(category)
+            .Replace("Категория:", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("Category:", "", StringComparison.OrdinalIgnoreCase)
+            .Trim();
+
+    private static string DisplayCategory(string category)
+        => NormalizeCategory(category);
+}

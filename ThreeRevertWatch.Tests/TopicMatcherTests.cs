@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using ThreeRevertWatch.Contracts;
 using ThreeRevertWatch.TopicMatcher.Configuration;
 using ThreeRevertWatch.TopicMatcher.Matching;
+using ThreeRevertWatch.TopicMatcher.Metadata;
 using ThreeRevertWatch.TopicMatcher.Persistence;
 
 namespace ThreeRevertWatch.Tests;
@@ -55,7 +57,44 @@ public sealed class TopicMatcherTests
         Assert.InRange(match.Confidence, 0.3, 0.7);
     }
 
-    private static RuleBasedTopicMatcher CreateMatcher(IReadOnlyList<long>? seedPageIds = null)
+    [Fact]
+    public async Task Category_keyword_can_confirm_topic_when_title_is_weak()
+    {
+        var metadata = new FakeWikiPageMetadataClient(
+            new WikiPageMetadata(
+                "ruwiki",
+                100,
+                "Массированная атака",
+                ["Категория:Российско-украинская война", "Категория:2026 год на Украине"]));
+        var matcher = CreateMatcher(metadataClient: metadata);
+
+        var matches = await matcher.MatchAsync(Edit(pageId: 100, title: "Массированная атака"), CancellationToken.None);
+
+        var match = Assert.Single(matches);
+        Assert.Equal(TopicMembershipStatus.Confirmed, match.Status);
+        Assert.InRange(match.Confidence, 0.7, 0.9);
+        Assert.Contains(match.Reasons, reason => reason.Contains("category keyword", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Excluded_category_rejects_article()
+    {
+        var metadata = new FakeWikiPageMetadataClient(
+            new WikiPageMetadata(
+                "ruwiki",
+                101,
+                "Россия в кино",
+                ["Категория:Фильмы о России", "Категория:Российские фильмы"]));
+        var matcher = CreateMatcher(metadataClient: metadata);
+
+        var matches = await matcher.MatchAsync(Edit(pageId: 101, title: "Россия в кино"), CancellationToken.None);
+
+        Assert.Empty(matches);
+    }
+
+    private static RuleBasedTopicMatcher CreateMatcher(
+        IReadOnlyList<long>? seedPageIds = null,
+        IWikiPageMetadataClient? metadataClient = null)
     {
         var options = Options.Create(new ConflictTopicsOptions
         {
@@ -71,12 +110,19 @@ public sealed class TopicMatcherTests
                     SeedPageIds = seedPageIds?.ToList() ?? [],
                     SeedTitles = ["Российско-украинская война"],
                     TitleKeywords = ["Украина", "Россия"],
-                    ExcludeTitleKeywords = ["фильм", "песня"]
+                    CategoryKeywords = ["российско-украинская война", "украин"],
+                    IncludeCategories = ["Российско-украинская война"],
+                    ExcludeTitleKeywords = ["фильм", "песня"],
+                    ExcludeCategoryKeywords = ["фильмы", "песни"]
                 }
             ]
         });
 
-        return new RuleBasedTopicMatcher(options, new InMemoryTopicArticleRepository());
+        return new RuleBasedTopicMatcher(
+            options,
+            new InMemoryTopicArticleRepository(),
+            metadataClient ?? new NoopWikiPageMetadataClient(),
+            NullLogger<RuleBasedTopicMatcher>.Instance);
     }
 
     private static RawEditEvent Edit(long pageId = 7, string title = "Украина")
@@ -98,4 +144,21 @@ public sealed class TopicMatcherTests
             20,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow);
+
+    private sealed class FakeWikiPageMetadataClient : IWikiPageMetadataClient
+    {
+        private readonly WikiPageMetadata _metadata;
+
+        public FakeWikiPageMetadataClient(WikiPageMetadata metadata)
+        {
+            _metadata = metadata;
+        }
+
+        public Task<WikiPageMetadata> GetAsync(
+            string wiki,
+            long pageId,
+            string title,
+            CancellationToken cancellationToken)
+            => Task.FromResult(_metadata);
+    }
 }

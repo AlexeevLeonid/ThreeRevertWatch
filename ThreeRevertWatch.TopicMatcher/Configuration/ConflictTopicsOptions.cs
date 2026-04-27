@@ -10,6 +10,14 @@ public sealed class ConflictTopicsOptions
     public List<ConflictTopicConfig> Topics { get; set; } = [];
 }
 
+public sealed class PageMetadataOptions
+{
+    public const string SectionName = "PageMetadata";
+
+    public bool Enabled { get; set; } = true;
+    public int CacheTtlMinutes { get; set; } = 60;
+}
+
 public sealed class ConflictTopicConfig
 {
     public string Id { get; set; } = "";
@@ -20,7 +28,9 @@ public sealed class ConflictTopicConfig
     public List<string> SeedTitles { get; set; } = [];
     public List<string> TitleKeywords { get; set; } = [];
     public List<string> CategoryKeywords { get; set; } = [];
+    public List<string> IncludeCategories { get; set; } = [];
     public List<string> IncludeTitleKeywords { get; set; } = [];
     public List<string> ExcludeTitleKeywords { get; set; } = [];
+    public List<string> ExcludeCategories { get; set; } = [];
+    public List<string> ExcludeCategoryKeywords { get; set; } = [];
 }
-

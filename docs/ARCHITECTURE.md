@@ -18,7 +18,7 @@ ConflictTopic
 ## Services
 
 - `ThreeRevertWatch.Collector` polls Wikipedia RecentChanges and publishes raw edits to Kafka.
-- `ThreeRevertWatch.TopicMatcher` consumes raw edits, applies manual/rule-based topic membership, updates `topic_articles`, and publishes matched topic edits.
+- `ThreeRevertWatch.TopicMatcher` consumes raw edits, applies manual/rule-based topic membership, uses cached Wikipedia page categories when title rules are insufficient, updates `topic_articles`, and publishes matched topic edits.
 - `ThreeRevertWatch.ConflictDetector` consumes matched edits, fetches minimal revision details, classifies edit actions, updates article runtime state, persists evidence, and publishes article conflict updates.
 - `ThreeRevertWatch.Aggregator` consumes article conflict updates, builds article/topic read models in Postgres and Redis, and exposes read APIs.
 - `ThreeRevertWatch.Gateway` proxies REST APIs and broadcasts realtime conflict updates through SignalR.
@@ -40,6 +40,18 @@ Removed from the old architecture:
 - `wiki.topic-conflict-updates` keyed by `TopicId`
 
 Kafka partition keys keep article edits ordered inside a page. The workers process messages sequentially per consumer loop; per-page order depends on all events for that page using the same key.
+
+## Topic Matching
+
+Topic membership is intentionally rule/manual first:
+
+- exact seed page ids
+- exact seed titles
+- include/exclude title keywords
+- cached `topic_articles` memberships
+- Wikipedia page categories fetched only when configured category rules can improve or reject a weak title match
+
+The page category lookup uses `prop=categories` with hidden categories excluded and is cached in the TopicMatcher process. Edit tags from RecentChanges are still used for edit-action classification; they are not treated as article topics.
 
 ## Persistence
 

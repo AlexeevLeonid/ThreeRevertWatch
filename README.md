@@ -13,7 +13,7 @@ Collector -> TopicMatcher -> ConflictDetector -> Aggregator -> Gateway -> Fronte
 - `ThreeRevertWatch.Contracts` shared DTOs/events
 - `ThreeRevertWatch.Infrastructure` Kafka, Postgres schema, logging, options
 - `ThreeRevertWatch.Collector` raw Wikipedia edits
-- `ThreeRevertWatch.TopicMatcher` rule/manual conflict topic membership
+- `ThreeRevertWatch.TopicMatcher` rule/manual conflict topic membership with cached Wikipedia category matching
 - `ThreeRevertWatch.ConflictDetector` edit classification, revert graph, article score
 - `ThreeRevertWatch.Aggregator` topic/article read model API
 - `ThreeRevertWatch.Gateway` REST proxy and SignalR hub
