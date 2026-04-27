@@ -1,0 +1,10 @@
+@ThreeRevertWatch.Aggregator_HostAddress = http://localhost:5065
+
+GET {{ThreeRevertWatch.Aggregator_HostAddress}}/health
+
+###
+
+GET {{ThreeRevertWatch.Aggregator_HostAddress}}/api/conflicts/topics
+Accept: application/json
+
+###

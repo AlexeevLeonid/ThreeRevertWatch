@@ -1,0 +1,145 @@
+@page "/topics/{TopicId}/articles/{PageId:long}"
+@rendermode InteractiveServer
+@inject GatewayApiClient Api
+@inject ConflictRealtimeClient Realtime
+
+<PageTitle>@(_article?.Title ?? "Article")</PageTitle>
+
+@if (_article is null)
+{
+    <div class="empty-state">Loading article...</div>
+}
+else
+{
+    <section class="page-head">
+        <div>
+            <p class="eyebrow">@_article.Wiki · @_article.TopicId</p>
+            <h1>@_article.Title</h1>
+        </div>
+        <StatusBadge Text="@_article.Status.ToString()" Score="@_article.ConflictScore" />
+    </section>
+
+    <section class="summary-band">
+        <MetricBlock Label="Topic relevance" Value="@_article.TopicRelevanceScore.ToString("0.00")" />
+        <MetricBlock Label="Conflict score" Value="@_article.ConflictScore.ToString("0")" />
+        <MetricBlock Label="Recent edits" Value="@_article.RecentEditCount.ToString()" />
+        <MetricBlock Label="Recent reverts" Value="@_article.RecentRevertCount.ToString()" />
+        <MetricBlock Label="Participants" Value="@_article.RecentParticipantCount.ToString()" />
+    </section>
+
+    <section class="detail-grid">
+        <div>
+            <h2>Evidence</h2>
+            <ul class="evidence-list">
+                @foreach (var item in _article.Evidence)
+                {
+                    <li>@item</li>
+                }
+            </ul>
+
+            <h2>Recent edits</h2>
+            <div class="data-list">
+                @foreach (var edit in _article.RecentEdits.Take(20))
+                {
+                    <a class="data-row" href="@DiffUrl(edit)" target="_blank">
+                        <span>@edit.Timestamp.ToLocalTime().ToString("dd.MM HH:mm")</span>
+                        <strong>@edit.User</strong>
+                        <StatusBadge Text="@edit.Action.ToString()" Score="@(edit.Action == EditActionType.OrdinaryEdit ? 8 : 68)" />
+                        <em>@edit.Comment</em>
+                    </a>
+                }
+            </div>
+        </div>
+
+        <aside>
+            <h2>Participants</h2>
+            <table>
+                <thead>
+                <tr><th>User</th><th>Edits</th><th>Reverts</th><th>Reverted</th></tr>
+                </thead>
+                <tbody>
+                @foreach (var participant in _article.Participants)
+                {
+                    <tr>
+                        <td>@participant.User</td>
+                        <td>@participant.EditCount</td>
+                        <td>@participant.RevertCount</td>
+                        <td>@participant.RevertedByOthersCount</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+
+            <h2>Revert edges</h2>
+            <div class="edge-list">
+                @foreach (var edge in _article.RevertEdges.Take(20))
+                {
+                    <div class="edge-row">
+                        <strong>@edge.FromUser</strong>
+                        <span>reverted</span>
+                        <strong>@edge.ToUser</strong>
+                    </div>
+                }
+            </div>
+
+            <h2>Participant clusters</h2>
+            @if (_article.ParticipantClusters.Count == 0)
+            {
+                <p class="muted">Not enough behavioral evidence.</p>
+            }
+            else
+            {
+                @foreach (var cluster in _article.ParticipantClusters)
+                {
+                    <div class="cluster-row">
+                        <strong>@cluster.ClusterId</strong>
+                        <span>@string.Join(", ", cluster.Users)</span>
+                        <small>@cluster.Confidence.ToString("P0")</small>
+                    </div>
+                }
+            }
+
+            <h2>Disputed fragments</h2>
+            @if (_article.DisputedFragments.Count == 0)
+            {
+                <p class="muted">No fragment-level diff evidence yet.</p>
+            }
+        </aside>
+    </section>
+}
+
+@code {
+    [Parameter] public string TopicId { get; set; } = "";
+    [Parameter] public long PageId { get; set; }
+
+    private ArticleConflictSnapshotDto? _article;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _article = await Api.GetArticleAsync(TopicId, PageId);
+        try
+        {
+            await Realtime.ConnectAsync(onArticleUpdated: update =>
+            {
+                if (update.TopicId == TopicId && update.PageId == PageId)
+                {
+                    _article = update.Snapshot;
+                }
+                return InvokeAsync(StateHasChanged);
+            });
+            await Realtime.JoinArticleAsync(TopicId, PageId);
+        }
+        catch
+        {
+        }
+    }
+
+    private string DiffUrl(ClassifiedEditDto edit)
+    {
+        var language = edit.Wiki.EndsWith("wiki", StringComparison.OrdinalIgnoreCase)
+            ? edit.Wiki[..^4]
+            : edit.Wiki;
+        return $"https://{language}.wikipedia.org/w/index.php?diff={edit.RevisionId}";
+    }
+}
+

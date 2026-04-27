@@ -1,0 +1,24 @@
+@if (Articles.Count > 0)
+{
+    <section class="article-group">
+        <h2>@Title</h2>
+        <div class="article-table">
+            @foreach (var article in Articles)
+            {
+                <a class="article-row" href="@($"/topics/{article.TopicId}/articles/{article.PageId}")">
+                    <span class="article-title">@article.Title</span>
+                    <StatusBadge Text="@article.Status.ToString()" Score="@article.ConflictScore" />
+                    <span>@article.ConflictScore.ToString("0")</span>
+                    <span>@article.RecentRevertCount reverts</span>
+                    <span>@article.RecentParticipantCount users</span>
+                </a>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public IReadOnlyList<ArticleListItemDto> Articles { get; set; } = [];
+}
+

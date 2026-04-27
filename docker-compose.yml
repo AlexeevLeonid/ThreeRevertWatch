@@ -1,0 +1,249 @@
+name: three-revert-watch
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-threerevertwatch}
+      POSTGRES_USER: ${POSTGRES_USER:-threerevertwatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_TICK_TIME: "2000"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      zookeeper:
+        condition: service_started
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+    restart: unless-stopped
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["bash", "-lc"]
+    command:
+      - |
+        set -e
+        PARTITIONS=$${KAFKA_TOPIC_PARTITIONS:-6}
+        for topic in wiki.raw-edits wiki.topic-matched-edits wiki.article-conflict-updates wiki.topic-conflict-updates; do
+          kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic "$${topic}" --replication-factor 1 --partitions "$${PARTITIONS}"
+        done
+    environment:
+      KAFKA_TOPIC_PARTITIONS: ${KAFKA_TOPIC_PARTITIONS:-6}
+    restart: "no"
+
+  seq:
+    image: datalust/seq:latest
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: ${SEQ_FIRSTRUN_NOAUTHENTICATION:-true}
+    volumes:
+      - seq-data:/data
+    profiles: ["debug"]
+    restart: unless-stopped
+
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        PROJECT: ThreeRevertWatch.Collector
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Lan
+      ASPNETCORE_URLS: http://+:8080
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__GroupId: threerevertwatch-collector
+      Topics__RawEdits: wiki.raw-edits
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:5341
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health >/dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  topicmatcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        PROJECT: ThreeRevertWatch.TopicMatcher
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Lan
+      ASPNETCORE_URLS: http://+:8080
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__GroupId: threerevertwatch-topicmatcher
+      ConnectionStrings__PostgreSQL: Host=postgres;Database=${POSTGRES_DB:-threerevertwatch};Username=${POSTGRES_USER:-threerevertwatch};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:5341
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health >/dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  conflictdetector:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        PROJECT: ThreeRevertWatch.ConflictDetector
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Lan
+      ASPNETCORE_URLS: http://+:8080
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__GroupId: threerevertwatch-conflictdetector
+      ConnectionStrings__PostgreSQL: Host=postgres;Database=${POSTGRES_DB:-threerevertwatch};Username=${POSTGRES_USER:-threerevertwatch};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:5341
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health >/dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  aggregator:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        PROJECT: ThreeRevertWatch.Aggregator
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Lan
+      ASPNETCORE_URLS: http://+:8080
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__GroupId: threerevertwatch-aggregator
+      ConnectionStrings__PostgreSQL: Host=postgres;Database=${POSTGRES_DB:-threerevertwatch};Username=${POSTGRES_USER:-threerevertwatch};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      ConnectionStrings__Redis: redis:6379
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:5341
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health >/dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        PROJECT: ThreeRevertWatch.Gateway
+    depends_on:
+      aggregator:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Lan
+      ASPNETCORE_URLS: http://+:8080
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__GroupId: threerevertwatch-gateway
+      ServiceUrls__AggregatorBaseUrl: http://aggregator:8080
+      ServiceUrls__GatewayPublicUrl: http://${LAN_HOST:-localhost}:${LAN_PORT:-8080}
+      Cors__AllowedOrigins__0: http://${LAN_HOST:-localhost}:${LAN_PORT:-8080}
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:5341
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health >/dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        PROJECT: ThreeRevertWatch.Frontend
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Lan
+      ASPNETCORE_URLS: http://+:8080
+      Gateway__BaseUrl: http://gateway:8080
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:5341
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health >/dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  kafka-data:
+  zookeeper-data:
+  zookeeper-log:
+  seq-data:

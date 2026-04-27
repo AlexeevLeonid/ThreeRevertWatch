@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="ThreeRevertWatch.Aggregator/ThreeRevertWatch.Aggregator.csproj" />
+  <Project Path="ThreeRevertWatch.Collector/ThreeRevertWatch.Collector.csproj" />
+  <Project Path="ThreeRevertWatch.ConflictDetector/ThreeRevertWatch.ConflictDetector.csproj" />
+  <Project Path="ThreeRevertWatch.Contracts/ThreeRevertWatch.Contracts.csproj" />
+  <Project Path="ThreeRevertWatch.Frontend/ThreeRevertWatch.Frontend.csproj" />
+  <Project Path="ThreeRevertWatch.Gateway/ThreeRevertWatch.Gateway.csproj" />
+  <Project Path="ThreeRevertWatch.Infrastructure/ThreeRevertWatch.Infrastructure.csproj" />
+  <Project Path="ThreeRevertWatch.Tests/ThreeRevertWatch.Tests.csproj" />
+  <Project Path="ThreeRevertWatch.TopicMatcher/ThreeRevertWatch.TopicMatcher.csproj" />
+</Solution>

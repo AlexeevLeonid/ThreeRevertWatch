@@ -1,0 +1,16 @@
+<span class="@CssClass">@Text</span>
+
+@code {
+    [Parameter] public string Text { get; set; } = "";
+    [Parameter] public double Score { get; set; }
+
+    private string CssClass => Score switch
+    {
+        >= 80 => "status-badge risk-high",
+        >= 60 => "status-badge risk-war",
+        >= 40 => "status-badge risk-dispute",
+        >= 20 => "status-badge risk-watch",
+        _ => "status-badge risk-quiet"
+    };
+}
+

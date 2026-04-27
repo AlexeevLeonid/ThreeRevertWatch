@@ -1,0 +1,113 @@
+@page "/topics/{TopicId}"
+@rendermode InteractiveServer
+@inject GatewayApiClient Api
+@inject ConflictRealtimeClient Realtime
+
+<PageTitle>@(_topic?.DisplayName ?? "Topic")</PageTitle>
+
+@if (_topic is null)
+{
+    <div class="empty-state">Loading topic...</div>
+}
+else
+{
+    <section class="page-head">
+        <div>
+            <p class="eyebrow">Conflict Topic</p>
+            <h1>@_topic.DisplayName</h1>
+        </div>
+        <StatusBadge Text="@_topic.Status.ToString()" Score="@_topic.ConflictScore" />
+    </section>
+
+    <section class="summary-band">
+        <MetricBlock Label="Conflict score" Value="@_topic.ConflictScore.ToString("0")" />
+        <MetricBlock Label="Active articles" Value="@_topic.ActiveArticleCount.ToString()" />
+        <MetricBlock Label="Recent edits" Value="@_topic.RecentEditCount.ToString()" />
+        <MetricBlock Label="Recent reverts" Value="@_topic.RecentRevertCount.ToString()" />
+        <MetricBlock Label="Participants" Value="@_topic.RecentParticipantCount.ToString()" />
+    </section>
+
+    <section class="toolbar-line">
+        <label>
+            Sort
+            <select @bind="_sort">
+                <option value="score">Conflict score</option>
+                <option value="last">Last edit</option>
+                <option value="reverts">Revert count</option>
+            </select>
+        </label>
+    </section>
+
+    <ArticleGroup Title="Hot now" Articles="@SortedArticles.Where(a => a.ConflictScore >= 60).ToList()" />
+    <ArticleGroup Title="Edit war candidates" Articles="@SortedArticles.Where(a => a.Status is ArticleConflictStatus.EditWarCandidate or ArticleConflictStatus.ThreeRevertRisk or ArticleConflictStatus.HighRisk).ToList()" />
+    <ArticleGroup Title="Watching" Articles="@SortedArticles.Where(a => a.ConflictScore < 60 && a.ConflictScore >= 20).ToList()" />
+    <ArticleGroup Title="Core articles" Articles="@SortedArticles.Where(a => a.RelevanceScore >= .9).ToList()" />
+    <ArticleGroup Title="Candidate articles" Articles="@SortedArticles.Where(a => a.RelevanceScore < .9).ToList()" />
+}
+
+@code {
+    [Parameter] public string TopicId { get; set; } = "";
+
+    private TopicSnapshotDto? _topic;
+    private List<ArticleListItemDto> _articles = [];
+    private string _sort = "score";
+
+    private IReadOnlyList<ArticleListItemDto> SortedArticles => _sort switch
+    {
+        "last" => _articles.OrderByDescending(a => a.LastEditAt).ToList(),
+        "reverts" => _articles.OrderByDescending(a => a.RecentRevertCount).ToList(),
+        _ => _articles.OrderByDescending(a => a.ConflictScore).ToList()
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _topic = await Api.GetTopicAsync(TopicId);
+        _articles = (await Api.GetArticlesAsync(TopicId)).ToList();
+        try
+        {
+            await Realtime.ConnectAsync(
+                onTopicUpdated: snapshot =>
+                {
+                    if (snapshot.TopicId == TopicId)
+                    {
+                        _topic = snapshot;
+                        _articles = snapshot.Articles.ToList();
+                    }
+                    return InvokeAsync(StateHasChanged);
+                },
+                onArticleUpdated: update =>
+                {
+                    if (update.TopicId == TopicId)
+                    {
+                        var item = new ArticleListItemDto(
+                            update.Snapshot.TopicId,
+                            update.Snapshot.Wiki,
+                            update.Snapshot.PageId,
+                            update.Snapshot.Title,
+                            update.Snapshot.TopicRelevanceScore,
+                            update.Snapshot.ConflictScore,
+                            update.Snapshot.RecentEditCount,
+                            update.Snapshot.RecentRevertCount,
+                            update.Snapshot.RecentParticipantCount,
+                            update.Snapshot.Status,
+                            update.Edit.Timestamp);
+                        var index = _articles.FindIndex(a => a.PageId == item.PageId);
+                        if (index >= 0)
+                        {
+                            _articles[index] = item;
+                        }
+                        else
+                        {
+                            _articles.Add(item);
+                        }
+                    }
+                    return InvokeAsync(StateHasChanged);
+                });
+            await Realtime.JoinTopicAsync(TopicId);
+        }
+        catch
+        {
+        }
+    }
+}
+

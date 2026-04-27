@@ -1,0 +1,10 @@
+@ThreeRevertWatch.Gateway_HostAddress = http://localhost:5206
+
+GET {{ThreeRevertWatch.Gateway_HostAddress}}/health
+
+###
+
+GET {{ThreeRevertWatch.Gateway_HostAddress}}/api/conflicts/topics
+Accept: application/json
+
+###

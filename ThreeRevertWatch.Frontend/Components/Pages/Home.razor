@@ -1,0 +1,94 @@
+@page "/"
+@rendermode InteractiveServer
+@inject GatewayApiClient Api
+@inject ConflictRealtimeClient Realtime
+
+<PageTitle>Conflict Topics</PageTitle>
+
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Realtime Wikipedia</p>
+        <h1>Conflict Topics Dashboard</h1>
+    </div>
+    <span class="live-pill">@_connectionState</span>
+</section>
+
+@if (_topics is null)
+{
+    <div class="empty-state">Loading topics...</div>
+}
+else if (_topics.Count == 0)
+{
+    <div class="empty-state">No conflict snapshots yet.</div>
+}
+else
+{
+    <section class="topic-grid">
+        @foreach (var topic in _topics)
+        {
+            <a class="topic-card" href="@($"/topics/{topic.TopicId}")">
+                <div class="row-split">
+                    <h2>@topic.DisplayName</h2>
+                    <StatusBadge Text="@topic.Status.ToString()" Score="@topic.ConflictScore" />
+                </div>
+                <div class="score-line">
+                    <span>@topic.ConflictScore.ToString("0")</span>
+                    <meter min="0" max="100" value="@topic.ConflictScore"></meter>
+                </div>
+                <div class="metric-grid">
+                    <MetricBlock Label="Active articles" Value="@topic.ActiveArticleCount.ToString()" />
+                    <MetricBlock Label="Recent edits" Value="@topic.RecentEditCount.ToString()" />
+                    <MetricBlock Label="Reverts" Value="@topic.RecentRevertCount.ToString()" />
+                    <MetricBlock Label="Participants" Value="@topic.RecentParticipantCount.ToString()" />
+                </div>
+                <div class="mini-list">
+                    @foreach (var article in topic.Articles.Take(4))
+                    {
+                        <span>@article.Title <b>@article.ConflictScore.ToString("0")</b></span>
+                    }
+                </div>
+            </a>
+        }
+    </section>
+}
+
+@code {
+    private List<TopicSnapshotDto>? _topics;
+    private string _connectionState = "connecting";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _topics = (await Api.GetTopicsAsync()).ToList();
+        try
+        {
+            await Realtime.ConnectAsync(onTopicUpdated: snapshot =>
+            {
+                Upsert(snapshot);
+                return InvokeAsync(StateHasChanged);
+            });
+            await Realtime.JoinTopicsAsync();
+            _connectionState = "live";
+        }
+        catch
+        {
+            _connectionState = "offline";
+        }
+    }
+
+    private void Upsert(TopicSnapshotDto snapshot)
+    {
+        _topics ??= [];
+        var index = _topics.FindIndex(t => t.TopicId == snapshot.TopicId);
+        if (index >= 0)
+        {
+            _topics[index] = snapshot;
+        }
+        else
+        {
+            _topics.Add(snapshot);
+        }
+
+        _topics = _topics.OrderByDescending(t => t.ConflictScore).ToList();
+    }
+}
+

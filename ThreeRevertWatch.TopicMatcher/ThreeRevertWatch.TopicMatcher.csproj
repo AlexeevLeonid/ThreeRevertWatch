@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-ThreeRevertWatch.TopicMatcher-1d6e89c5-2036-4515-beda-da19a7cd04ef</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThreeRevertWatch.Contracts\ThreeRevertWatch.Contracts.csproj" />
+    <ProjectReference Include="..\ThreeRevertWatch.Infrastructure\ThreeRevertWatch.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
