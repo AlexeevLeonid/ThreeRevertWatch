@@ -108,6 +108,7 @@ services:
         condition: service_healthy
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST in .env, for example demo.example.com}
+      PUBLIC_FALLBACK_HOST: ${PUBLIC_FALLBACK_HOST:-localhost}
     ports:
       - "${PUBLIC_HTTP_PORT:-80}:80"
       - "${PUBLIC_HTTPS_PORT:-443}:443"
@@ -124,6 +125,8 @@ services:
       ServiceUrls__GatewayPublicUrl: https://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
       Cors__AllowedOrigins__0: https://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
       Cors__AllowedOrigins__1: http://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
+      Cors__AllowedOrigins__2: https://${PUBLIC_FALLBACK_HOST:-localhost}
+      Cors__AllowedOrigins__3: http://${PUBLIC_FALLBACK_HOST:-localhost}
     logging: *demo-logging
 
   frontend:
