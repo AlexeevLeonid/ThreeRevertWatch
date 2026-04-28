@@ -6,16 +6,23 @@ x-demo-logging: &demo-logging
 
 services:
   postgres:
+    mem_limit: ${DEMO_POSTGRES_MEM_LIMIT:-384m}
     logging: *demo-logging
 
   redis:
+    mem_limit: ${DEMO_REDIS_MEM_LIMIT:-128m}
     logging: *demo-logging
 
   zookeeper:
+    mem_limit: ${DEMO_ZOOKEEPER_MEM_LIMIT:-384m}
+    environment:
+      KAFKA_HEAP_OPTS: ${DEMO_ZOOKEEPER_HEAP_OPTS:--Xms128m -Xmx256m}
     logging: *demo-logging
 
   kafka:
+    mem_limit: ${DEMO_KAFKA_MEM_LIMIT:-768m}
     environment:
+      KAFKA_HEAP_OPTS: ${DEMO_KAFKA_HEAP_OPTS:--Xms256m -Xmx512m}
       KAFKA_LOG_RETENTION_HOURS: ${KAFKA_LOG_RETENTION_HOURS:-72}
       KAFKA_LOG_RETENTION_BYTES: ${KAFKA_LOG_RETENTION_BYTES:-1073741824}
       KAFKA_LOG_SEGMENT_BYTES: ${KAFKA_LOG_SEGMENT_BYTES:-268435456}
@@ -25,19 +32,24 @@ services:
     logging: *demo-logging
 
   collector:
+    mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
     logging: *demo-logging
 
   topicmatcher:
+    mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
     logging: *demo-logging
 
   conflictdetector:
+    mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
     logging: *demo-logging
 
   aggregator:
+    mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
     logging: *demo-logging
 
   reverse-proxy:
     image: caddy:2.8-alpine
+    mem_limit: ${DEMO_REVERSE_PROXY_MEM_LIMIT:-128m}
     depends_on:
       frontend:
         condition: service_healthy
@@ -56,6 +68,7 @@ services:
     logging: *demo-logging
 
   gateway:
+    mem_limit: ${DEMO_DOTNET_WEB_MEM_LIMIT:-384m}
     environment:
       ServiceUrls__GatewayPublicUrl: https://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
       Cors__AllowedOrigins__0: https://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
@@ -63,10 +76,12 @@ services:
     logging: *demo-logging
 
   frontend:
+    mem_limit: ${DEMO_DOTNET_WEB_MEM_LIMIT:-384m}
     logging: *demo-logging
 
   postgres-retention:
     image: postgres:16
+    mem_limit: ${DEMO_RETENTION_MEM_LIMIT:-128m}
     depends_on:
       postgres:
         condition: service_healthy

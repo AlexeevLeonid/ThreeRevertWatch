@@ -29,3 +29,7 @@ git pull --ff-only origin "$DEPLOY_BRANCH"
 "${COMPOSE[@]}" -f docker-compose.yml -f docker-compose.demo.yml config --quiet
 "${COMPOSE[@]}" -f docker-compose.yml -f docker-compose.demo.yml up -d --build --remove-orphans
 "${COMPOSE[@]}" -f docker-compose.yml -f docker-compose.demo.yml ps
+
+docker builder prune -af >/dev/null || true
+docker image prune -f >/dev/null || true
+docker system df || true
