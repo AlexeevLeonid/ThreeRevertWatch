@@ -31,20 +31,71 @@ services:
   kafka-init:
     logging: *demo-logging
 
+  db-init:
+    image: postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-threerevertwatch}
+      POSTGRES_USER: ${POSTGRES_USER:-threerevertwatch}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./db/migrations/001_conflict_monitoring.sql:/schema.sql:ro
+    entrypoint: ["bash", "-lc"]
+    command:
+      - |
+        set -euo pipefail
+        psql \
+          --host=postgres \
+          --username="$${POSTGRES_USER}" \
+          --dbname="$${POSTGRES_DB}" \
+          --set=ON_ERROR_STOP=1 \
+          --file=/schema.sql
+    restart: "no"
+    logging: *demo-logging
+
   collector:
     mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
     logging: *demo-logging
 
   topicmatcher:
     mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     logging: *demo-logging
 
   conflictdetector:
     mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      Database__MigrateOnStartup: "false"
     logging: *demo-logging
 
   aggregator:
     mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      Database__MigrateOnStartup: "false"
     logging: *demo-logging
 
   reverse-proxy:
@@ -85,6 +136,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-threerevertwatch}
       POSTGRES_USER: ${POSTGRES_USER:-threerevertwatch}
