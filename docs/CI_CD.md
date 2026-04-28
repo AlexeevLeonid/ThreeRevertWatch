@@ -57,7 +57,9 @@ cd /opt/ThreeRevertWatch
 cp .env.example .env
 ```
 
-Edit `.env` with the real `PUBLIC_HOST` and `POSTGRES_PASSWORD`.
+Edit `.env` with the real `PUBLIC_HOST` and `POSTGRES_PASSWORD`. If the domain
+was registered minutes ago, you can also set `PUBLIC_FALLBACK_HOST` to an
+`sslip.io` host such as `195-209-213-190.sslip.io` until public DNS catches up.
 
 For the first manual deploy from the VPS:
 

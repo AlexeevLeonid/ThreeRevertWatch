@@ -4,6 +4,7 @@ This is the short path for a public demo that can live for a few weeks.
 It keeps the current single-host Docker Compose architecture and adds:
 
 - Caddy reverse proxy with automatic HTTPS for a real domain.
+- Optional fallback HTTPS host for the first hours while fresh DNS propagates.
 - Kafka log retention defaults for a small demo box.
 - A Postgres cleanup sidecar that keeps detailed history short.
 
@@ -29,6 +30,7 @@ Copy `.env.example` to `.env` and set at least:
 
 ```env
 PUBLIC_HOST=demo.example.com
+PUBLIC_FALLBACK_HOST=localhost
 PUBLIC_HTTP_PORT=80
 PUBLIC_HTTPS_PORT=443
 POSTGRES_PASSWORD=replace-with-a-strong-password
@@ -47,6 +49,11 @@ DEMO_LOG_MAX_FILE=3
 `PUBLIC_HOST` must be only the host name, without `https://` and without a path.
 `www.PUBLIC_HOST` redirects to `PUBLIC_HOST`, so point both DNS records at the VM
 if you want both names to work.
+
+`PUBLIC_FALLBACK_HOST` is useful when a new domain is not visible from public
+DNS yet. For example, `195-209-213-190.sslip.io` automatically resolves to
+`195.209.213.190`; Caddy can issue a temporary certificate for it while the real
+domain catches up. Leave it as `localhost` if no fallback URL is needed.
 
 ## 3. Start The Demo Stack
 
