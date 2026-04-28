@@ -4,4 +4,6 @@
 **/.git/
 .env
 docker-compose*.yml
-
+.agents/
+.agent-state/
+.agent-handoffs/
