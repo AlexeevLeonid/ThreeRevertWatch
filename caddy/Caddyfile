@@ -1,6 +1,14 @@
 {$PUBLIC_HOST} {
     encode zstd gzip
 
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
     @health path /health
     respond @health "ok\n" 200
 
@@ -11,4 +19,8 @@
     reverse_proxy @hubs gateway:8080
 
     reverse_proxy frontend:8080
+}
+
+www.{$PUBLIC_HOST} {
+    redir https://{$PUBLIC_HOST}{uri} permanent
 }

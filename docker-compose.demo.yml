@@ -1,9 +1,40 @@
+x-demo-logging: &demo-logging
+  driver: json-file
+  options:
+    max-size: ${DEMO_LOG_MAX_SIZE:-10m}
+    max-file: ${DEMO_LOG_MAX_FILE:-3}
+
 services:
+  postgres:
+    logging: *demo-logging
+
+  redis:
+    logging: *demo-logging
+
+  zookeeper:
+    logging: *demo-logging
+
   kafka:
     environment:
       KAFKA_LOG_RETENTION_HOURS: ${KAFKA_LOG_RETENTION_HOURS:-72}
       KAFKA_LOG_RETENTION_BYTES: ${KAFKA_LOG_RETENTION_BYTES:-1073741824}
       KAFKA_LOG_SEGMENT_BYTES: ${KAFKA_LOG_SEGMENT_BYTES:-268435456}
+    logging: *demo-logging
+
+  kafka-init:
+    logging: *demo-logging
+
+  collector:
+    logging: *demo-logging
+
+  topicmatcher:
+    logging: *demo-logging
+
+  conflictdetector:
+    logging: *demo-logging
+
+  aggregator:
+    logging: *demo-logging
 
   reverse-proxy:
     image: caddy:2.8-alpine
@@ -22,12 +53,17 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     restart: unless-stopped
+    logging: *demo-logging
 
   gateway:
     environment:
       ServiceUrls__GatewayPublicUrl: https://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
       Cors__AllowedOrigins__0: https://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
       Cors__AllowedOrigins__1: http://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
+    logging: *demo-logging
+
+  frontend:
+    logging: *demo-logging
 
   postgres-retention:
     image: postgres:16
@@ -62,6 +98,7 @@ services:
           sleep "$${DEMO_CLEANUP_INTERVAL_SECONDS}"
         done
     restart: unless-stopped
+    logging: *demo-logging
 
 volumes:
   caddy-data:

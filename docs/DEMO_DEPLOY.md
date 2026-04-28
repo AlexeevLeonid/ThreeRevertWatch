@@ -37,9 +37,13 @@ DEMO_EDIT_RETENTION_DAYS=3
 DEMO_SNAPSHOT_RETENTION_DAYS=7
 DEMO_CANDIDATE_RETENTION_DAYS=7
 DEMO_CLEANUP_INTERVAL_SECONDS=86400
+DEMO_LOG_MAX_SIZE=10m
+DEMO_LOG_MAX_FILE=3
 ```
 
 `PUBLIC_HOST` must be only the host name, without `https://` and without a path.
+`www.PUBLIC_HOST` redirects to `PUBLIC_HOST`, so point both DNS records at the VM
+if you want both names to work.
 
 ## 3. Start The Demo Stack
 
