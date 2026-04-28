@@ -103,6 +103,25 @@ docker compose --profile debug -f docker-compose.yml -f docker-compose.lan.yml u
 
 In debug profile, expose Seq only deliberately, for example by adding a local port binding in `docker-compose.override.yml`.
 
+## Public Demo Run
+
+For a short-lived public demo with a real domain and automatic HTTPS, use the demo overlay:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build
+```
+
+Set `PUBLIC_HOST` in `.env` to a DNS name that points at the server, for example `demo.example.com`.
+The demo overlay also limits Kafka log retention and runs a Postgres cleanup sidecar so detailed history can stay short.
+
+See [docs/DEMO_DEPLOY.md](docs/DEMO_DEPLOY.md) for the full checklist.
+
+## CI/CD
+
+GitHub Actions CI builds/tests the solution and validates the demo Compose file.
+The optional demo deploy workflow SSHes into a VPS and runs the Compose stack
+from the checked-out repository. See [docs/CI_CD.md](docs/CI_CD.md).
+
 ## Stop / Clean
 
 ```powershell

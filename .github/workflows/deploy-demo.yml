@@ -1,0 +1,72 @@
+name: Deploy demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to deploy
+        required: true
+        default: master
+  push:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to demo VPS
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || vars.DEMO_AUTO_DEPLOY == 'true'
+    environment:
+      name: demo
+      url: ${{ vars.DEMO_PUBLIC_URL }}
+
+    steps:
+      - name: Check required secrets
+        env:
+          DEMO_SSH_HOST: ${{ secrets.DEMO_SSH_HOST }}
+          DEMO_SSH_USER: ${{ secrets.DEMO_SSH_USER }}
+          DEMO_SSH_KEY: ${{ secrets.DEMO_SSH_KEY }}
+          DEMO_DEPLOY_PATH: ${{ secrets.DEMO_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          test -n "$DEMO_SSH_HOST" || { echo "Missing DEMO_SSH_HOST"; exit 1; }
+          test -n "$DEMO_SSH_USER" || { echo "Missing DEMO_SSH_USER"; exit 1; }
+          test -n "$DEMO_SSH_KEY" || { echo "Missing DEMO_SSH_KEY"; exit 1; }
+          test -n "$DEMO_DEPLOY_PATH" || { echo "Missing DEMO_DEPLOY_PATH"; exit 1; }
+
+      - name: Configure SSH
+        env:
+          DEMO_SSH_HOST: ${{ secrets.DEMO_SSH_HOST }}
+          DEMO_SSH_KEY: ${{ secrets.DEMO_SSH_KEY }}
+          DEMO_SSH_PORT: ${{ secrets.DEMO_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="${DEMO_SSH_PORT:-22}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEMO_SSH_KEY" > ~/.ssh/demo_deploy_key
+          chmod 600 ~/.ssh/demo_deploy_key
+          ssh-keyscan -p "$SSH_PORT" -H "$DEMO_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          DEMO_SSH_HOST: ${{ secrets.DEMO_SSH_HOST }}
+          DEMO_SSH_USER: ${{ secrets.DEMO_SSH_USER }}
+          DEMO_SSH_PORT: ${{ secrets.DEMO_SSH_PORT }}
+          DEMO_DEPLOY_PATH: ${{ secrets.DEMO_DEPLOY_PATH }}
+          MANUAL_BRANCH: ${{ inputs.branch }}
+          PUSH_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="${DEMO_SSH_PORT:-22}"
+          DEPLOY_BRANCH="${MANUAL_BRANCH:-$PUSH_BRANCH}"
+          REMOTE_CMD=$(printf 'cd %q && DEPLOY_BRANCH=%q bash scripts/deploy-demo.sh' "$DEMO_DEPLOY_PATH" "$DEPLOY_BRANCH")
+          ssh -i ~/.ssh/demo_deploy_key -p "$SSH_PORT" "$DEMO_SSH_USER@$DEMO_SSH_HOST" "$REMOTE_CMD"

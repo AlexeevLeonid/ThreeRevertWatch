@@ -1,0 +1,68 @@
+services:
+  kafka:
+    environment:
+      KAFKA_LOG_RETENTION_HOURS: ${KAFKA_LOG_RETENTION_HOURS:-72}
+      KAFKA_LOG_RETENTION_BYTES: ${KAFKA_LOG_RETENTION_BYTES:-1073741824}
+      KAFKA_LOG_SEGMENT_BYTES: ${KAFKA_LOG_SEGMENT_BYTES:-268435456}
+
+  reverse-proxy:
+    image: caddy:2.8-alpine
+    depends_on:
+      frontend:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST in .env, for example demo.example.com}
+    ports:
+      - "${PUBLIC_HTTP_PORT:-80}:80"
+      - "${PUBLIC_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+  gateway:
+    environment:
+      ServiceUrls__GatewayPublicUrl: https://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
+      Cors__AllowedOrigins__0: https://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
+      Cors__AllowedOrigins__1: http://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
+
+  postgres-retention:
+    image: postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-threerevertwatch}
+      POSTGRES_USER: ${POSTGRES_USER:-threerevertwatch}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      DEMO_EDIT_RETENTION_DAYS: ${DEMO_EDIT_RETENTION_DAYS:-3}
+      DEMO_SNAPSHOT_RETENTION_DAYS: ${DEMO_SNAPSHOT_RETENTION_DAYS:-7}
+      DEMO_CANDIDATE_RETENTION_DAYS: ${DEMO_CANDIDATE_RETENTION_DAYS:-7}
+      DEMO_CLEANUP_INTERVAL_SECONDS: ${DEMO_CLEANUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ./scripts/demo-retention.sql:/demo-retention.sql:ro
+    entrypoint: ["bash", "-lc"]
+    command:
+      - |
+        set -euo pipefail
+        while true; do
+          echo "Running demo retention cleanup at $$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          psql \
+            --host=postgres \
+            --username="$${POSTGRES_USER}" \
+            --dbname="$${POSTGRES_DB}" \
+            --set=ON_ERROR_STOP=1 \
+            --set=edit_retention_days="$${DEMO_EDIT_RETENTION_DAYS}" \
+            --set=snapshot_retention_days="$${DEMO_SNAPSHOT_RETENTION_DAYS}" \
+            --set=candidate_retention_days="$${DEMO_CANDIDATE_RETENTION_DAYS}" \
+            --file=/demo-retention.sql
+          sleep "$${DEMO_CLEANUP_INTERVAL_SECONDS}"
+        done
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
