@@ -22,5 +22,7 @@ public sealed class GatewayApiClient
 
     public Task<ArticleConflictSnapshotDto?> GetArticleAsync(string topicId, long pageId, CancellationToken cancellationToken = default)
         => _httpClient.GetFromJsonAsync<ArticleConflictSnapshotDto>($"/api/conflicts/topics/{Uri.EscapeDataString(topicId)}/articles/{pageId}", cancellationToken);
-}
 
+    public Task<PipelineMetricsDto?> GetPipelineMetricsAsync(CancellationToken cancellationToken = default)
+        => _httpClient.GetFromJsonAsync<PipelineMetricsDto>("/api/pipeline/metrics", cancellationToken);
+}

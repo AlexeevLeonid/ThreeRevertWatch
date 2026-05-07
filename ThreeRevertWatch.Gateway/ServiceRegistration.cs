@@ -13,6 +13,7 @@ public static class ServiceRegistration
         services.AddThreeRevertWatchOptions(configuration);
         services.AddThreeRevertWatchKafka();
         services.AddSignalR();
+        services.AddSingleton<PipelineMetricsService>();
         services.AddHttpClient<AggregatorProxyClient>((sp, client) =>
         {
             var options = sp.GetRequiredService<IOptions<ServiceUrlsOptions>>().Value;
@@ -23,4 +24,3 @@ public static class ServiceRegistration
         return services;
     }
 }
-

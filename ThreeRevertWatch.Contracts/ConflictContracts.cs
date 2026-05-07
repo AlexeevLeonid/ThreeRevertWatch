@@ -229,3 +229,19 @@ public sealed record ConflictAlertDto(
     IReadOnlyList<string> Evidence,
     DateTimeOffset ProducedAt);
 
+public sealed record PipelineMetricsDto(
+    DateTimeOffset UpdatedAt,
+    long TotalLag,
+    IReadOnlyList<PipelineStageMetricsDto> Stages);
+
+public sealed record PipelineStageMetricsDto(
+    string Id,
+    string Name,
+    string Service,
+    string Topic,
+    string? ConsumerGroup,
+    long CurrentOffset,
+    long LogEndOffset,
+    long Lag,
+    double MessagesPerMinute,
+    string Status);

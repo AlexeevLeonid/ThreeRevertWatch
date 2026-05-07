@@ -14,8 +14,8 @@ public sealed class RecentChangesCollectorWorker : BackgroundService
     private readonly CollectorOptions _collectorOptions;
     private readonly TopicsOptions _topics;
     private readonly ILogger<RecentChangesCollectorWorker> _logger;
-    private readonly Queue<long> _seenOrder = new();
-    private readonly HashSet<long> _seen = [];
+    private readonly Queue<string> _seenOrder = new();
+    private readonly HashSet<string> _seen = [];
 
     public RecentChangesCollectorWorker(
         IRecentChangesClient client,
@@ -56,7 +56,7 @@ public sealed class RecentChangesCollectorWorker : BackgroundService
 
             foreach (var edit in edits)
             {
-                if (!Remember(edit.WikiEditId))
+                if (!Remember(edit.Wiki, edit.WikiEditId))
                 {
                     continue;
                 }
@@ -77,14 +77,15 @@ public sealed class RecentChangesCollectorWorker : BackgroundService
         }
     }
 
-    private bool Remember(long wikiEditId)
+    private bool Remember(string wiki, long wikiEditId)
     {
-        if (!_seen.Add(wikiEditId))
+        var key = $"{wiki}:{wikiEditId}";
+        if (!_seen.Add(key))
         {
             return false;
         }
 
-        _seenOrder.Enqueue(wikiEditId);
+        _seenOrder.Enqueue(key);
         while (_seenOrder.Count > 2_000)
         {
             _seen.Remove(_seenOrder.Dequeue());
@@ -93,4 +94,3 @@ public sealed class RecentChangesCollectorWorker : BackgroundService
         return true;
     }
 }
-

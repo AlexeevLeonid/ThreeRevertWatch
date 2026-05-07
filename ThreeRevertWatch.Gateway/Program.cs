@@ -75,6 +75,9 @@ try
         return participants is null ? Results.NotFound() : Results.Ok(participants);
     });
 
+    app.MapGet("/api/pipeline/metrics", async (PipelineMetricsService metrics, CancellationToken ct) =>
+        Results.Ok(await metrics.GetAsync(ct)));
+
     app.Run();
 }
 catch (Exception ex)

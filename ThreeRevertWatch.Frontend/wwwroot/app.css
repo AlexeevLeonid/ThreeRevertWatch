@@ -326,6 +326,54 @@ tbody tr:last-child td {
     padding: 1rem;
 }
 
+.pipeline-summary {
+    grid-template-columns: repeat(3, minmax(8.5rem, 1fr));
+}
+
+.pipeline-list {
+    display: grid;
+    gap: .75rem;
+}
+
+.pipeline-row {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(12rem, .75fr) minmax(24rem, 1fr) auto;
+    padding: 1rem;
+}
+
+.pipeline-stage {
+    display: grid;
+    gap: .18rem;
+}
+
+.pipeline-stage h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.pipeline-stage small,
+.pipeline-service {
+    color: #6c757d;
+    font-size: .8rem;
+}
+
+.pipeline-service {
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.pipeline-metrics {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(4, minmax(6.5rem, 1fr));
+}
+
 h1:focus {
     outline: none;
 }
@@ -352,8 +400,14 @@ h1:focus {
 
     .article-row,
     .data-row,
+    .pipeline-row,
     .detail-grid {
         grid-template-columns: 1fr;
+    }
+
+    .pipeline-metrics,
+    .pipeline-summary {
+        grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
     }
 
     .cluster-row {

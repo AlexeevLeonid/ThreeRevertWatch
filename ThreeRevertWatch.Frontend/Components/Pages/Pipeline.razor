@@ -1,0 +1,120 @@
+@page "/pipeline"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject GatewayApiClient Api
+
+<PageTitle>Pipeline</PageTitle>
+
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Operations</p>
+        <h1>Pipeline</h1>
+    </div>
+    <span class="live-pill">@_state</span>
+</section>
+
+@if (_metrics is null && _loadError is null)
+{
+    <div class="empty-state">Loading pipeline metrics...</div>
+}
+else if (_loadError is not null)
+{
+    <div class="empty-state">@_loadError</div>
+}
+else if (_metrics is not null)
+{
+    <section class="summary-band pipeline-summary">
+        <MetricBlock Label="Total backlog" Value="@_metrics.TotalLag.ToString("N0")" />
+        <MetricBlock Label="Stages" Value="@_metrics.Stages.Count.ToString("N0")" />
+        <MetricBlock Label="Updated" Value="@_metrics.UpdatedAt.ToLocalTime().ToString("HH:mm:ss")" />
+    </section>
+
+    <section class="pipeline-list">
+        @foreach (var stage in _metrics.Stages)
+        {
+            <article class="pipeline-row">
+                <div class="pipeline-stage">
+                    <span class="pipeline-service">@stage.Service</span>
+                    <h2>@stage.Name</h2>
+                    <small>@stage.Topic</small>
+                </div>
+                <div class="pipeline-metrics">
+                    <MetricBlock Label="Processed" Value="@stage.CurrentOffset.ToString("N0")" />
+                    <MetricBlock Label="End offset" Value="@stage.LogEndOffset.ToString("N0")" />
+                    <MetricBlock Label="Backlog" Value="@stage.Lag.ToString("N0")" />
+                    <MetricBlock Label="Per minute" Value="@stage.MessagesPerMinute.ToString("N1")" />
+                </div>
+                <span class="@StatusClass(stage.Status)">@StatusText(stage.Status)</span>
+            </article>
+        }
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource _refreshCts = new();
+    private PipelineMetricsDto? _metrics;
+    private string? _loadError;
+    private string _state = "loading";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(_refreshCts.Token);
+        _ = RefreshLoopAsync();
+    }
+
+    public void Dispose()
+    {
+        _refreshCts.Cancel();
+        _refreshCts.Dispose();
+    }
+
+    private async Task RefreshLoopAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_refreshCts.Token))
+            {
+                await LoadAsync(_refreshCts.Token);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task LoadAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _metrics = await Api.GetPipelineMetricsAsync(cancellationToken);
+            _loadError = null;
+            _state = _metrics?.TotalLag > 0 ? "catching up" : "healthy";
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _loadError = "Pipeline metrics are unavailable.";
+            _state = "offline";
+        }
+    }
+
+    private static string StatusClass(string status)
+        => status switch
+        {
+            "healthy" => "status-badge risk-quiet",
+            "catching_up" => "status-badge risk-war",
+            "backlog" => "status-badge risk-high",
+            _ => "status-badge risk-watch"
+        };
+
+    private static string StatusText(string status)
+        => status switch
+        {
+            "healthy" => "ok",
+            "catching_up" => "catching up",
+            "backlog" => "backlog",
+            _ => "unavailable"
+        };
+}
