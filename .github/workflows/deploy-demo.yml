@@ -68,5 +68,5 @@ jobs:
           set -euo pipefail
           SSH_PORT="${DEMO_SSH_PORT:-22}"
           DEPLOY_BRANCH="${MANUAL_BRANCH:-$PUSH_BRANCH}"
-          REMOTE_CMD=$(printf 'cd %q && DEPLOY_BRANCH=%q bash scripts/deploy-demo.sh' "$DEMO_DEPLOY_PATH" "$DEPLOY_BRANCH")
+          REMOTE_CMD=$(printf 'set -euo pipefail; cd %q; git fetch --prune origin; if git show-ref --verify --quiet refs/heads/%q; then git checkout %q; else git checkout -B %q origin/%q; fi; git pull --ff-only origin %q; DEPLOY_BRANCH=%q bash scripts/deploy-demo.sh' "$DEMO_DEPLOY_PATH" "$DEPLOY_BRANCH" "$DEPLOY_BRANCH" "$DEPLOY_BRANCH" "$DEPLOY_BRANCH" "$DEPLOY_BRANCH" "$DEPLOY_BRANCH")
           ssh -i ~/.ssh/demo_deploy_key -p "$SSH_PORT" "$DEMO_SSH_USER@$DEMO_SSH_HOST" "$REMOTE_CMD"
