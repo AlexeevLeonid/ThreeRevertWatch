@@ -17,6 +17,11 @@ else
   exit 1
 fi
 
+# Compose v5 can route multi-service builds through buildx bake. On the small
+# demo VPS that path can hang with no useful progress, while the ordinary
+# compose builder remains reliable for this stack.
+export COMPOSE_BAKE="${COMPOSE_BAKE:-false}"
+
 echo "Deploying branch ${DEPLOY_BRANCH} in $(pwd)"
 git fetch --prune origin
 if git show-ref --verify --quiet "refs/heads/${DEPLOY_BRANCH}"; then
