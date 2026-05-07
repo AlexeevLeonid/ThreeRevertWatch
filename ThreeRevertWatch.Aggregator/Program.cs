@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Options;
 using Serilog;
 using ThreeRevertWatch.Aggregator;
+using ThreeRevertWatch.Aggregator.Configuration;
 using ThreeRevertWatch.Aggregator.ReadModel;
 using ThreeRevertWatch.Infrastructure.Logging;
 using ThreeRevertWatch.Infrastructure.Persistence;
@@ -30,17 +32,44 @@ try
 
     app.MapHealthChecks("/health");
 
-    app.MapGet("/api/conflicts/topics", async (IConflictReadModelStore store, CancellationToken ct) =>
-        Results.Ok(await store.GetTopicsAsync(ct)));
-
-    app.MapGet("/api/conflicts/topics/{topicId}", async (string topicId, IConflictReadModelStore store, CancellationToken ct) =>
+    app.MapGet("/api/conflicts/topics", async (
+        IConflictReadModelStore store,
+        IOptions<ConflictTopicsCatalogOptions> options,
+        CancellationToken ct) =>
     {
+        var topicIds = options.Value.Topics
+            .Select(t => t.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var topics = await store.GetTopicsAsync(ct);
+        return Results.Ok(topics.Where(topic => topicIds.Contains(topic.TopicId)));
+    });
+
+    app.MapGet("/api/conflicts/topics/{topicId}", async (
+        string topicId,
+        IConflictReadModelStore store,
+        IOptions<ConflictTopicsCatalogOptions> options,
+        CancellationToken ct) =>
+    {
+        if (!IsTrackedTopic(topicId, options.Value))
+        {
+            return Results.NotFound();
+        }
+
         var topic = await store.GetTopicAsync(topicId, ct);
         return topic is null ? Results.NotFound() : Results.Ok(topic);
     });
 
-    app.MapGet("/api/conflicts/topics/{topicId}/articles", async (string topicId, IConflictReadModelStore store, CancellationToken ct) =>
+    app.MapGet("/api/conflicts/topics/{topicId}/articles", async (
+        string topicId,
+        IConflictReadModelStore store,
+        IOptions<ConflictTopicsCatalogOptions> options,
+        CancellationToken ct) =>
     {
+        if (!IsTrackedTopic(topicId, options.Value))
+        {
+            return Results.NotFound();
+        }
+
         var articles = await store.GetArticleSnapshotsAsync(topicId, ct);
         return Results.Ok(articles
             .OrderByDescending(a => a.ConflictScore)
@@ -62,8 +91,14 @@ try
         string topicId,
         long pageId,
         IConflictReadModelStore store,
+        IOptions<ConflictTopicsCatalogOptions> options,
         CancellationToken ct) =>
     {
+        if (!IsTrackedTopic(topicId, options.Value))
+        {
+            return Results.NotFound();
+        }
+
         var article = await store.GetArticleSnapshotAsync(topicId, pageId, ct);
         return article is null ? Results.NotFound() : Results.Ok(article);
     });
@@ -72,8 +107,14 @@ try
         string topicId,
         long pageId,
         IConflictReadModelStore store,
+        IOptions<ConflictTopicsCatalogOptions> options,
         CancellationToken ct) =>
     {
+        if (!IsTrackedTopic(topicId, options.Value))
+        {
+            return Results.NotFound();
+        }
+
         var article = await store.GetArticleSnapshotAsync(topicId, pageId, ct);
         return article is null ? Results.NotFound() : Results.Ok(article.RecentEdits);
     });
@@ -82,8 +123,14 @@ try
         string topicId,
         long pageId,
         IConflictReadModelStore store,
+        IOptions<ConflictTopicsCatalogOptions> options,
         CancellationToken ct) =>
     {
+        if (!IsTrackedTopic(topicId, options.Value))
+        {
+            return Results.NotFound();
+        }
+
         var article = await store.GetArticleSnapshotAsync(topicId, pageId, ct);
         return article is null
             ? Results.NotFound()
@@ -101,3 +148,6 @@ finally
 {
     await Log.CloseAndFlushAsync();
 }
+
+static bool IsTrackedTopic(string topicId, ConflictTopicsCatalogOptions options)
+    => options.Topics.Any(topic => string.Equals(topic.Id, topicId, StringComparison.OrdinalIgnoreCase));

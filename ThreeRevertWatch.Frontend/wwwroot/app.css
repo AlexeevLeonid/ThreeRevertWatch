@@ -42,27 +42,9 @@ a,
     text-transform: uppercase;
 }
 
-.dashboard-toolbar {
-    align-items: center;
-    display: flex;
-    gap: 1rem;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-}
-
-.search-field {
-    flex: 0 1 24rem;
-}
-
-.updated-text,
 .muted,
 .empty-state {
     color: #6c757d;
-}
-
-.updated-text {
-    font-size: .9rem;
-    white-space: nowrap;
 }
 
 .live-pill,
@@ -359,22 +341,13 @@ h1:focus {
         padding-block: 1rem;
     }
 
-    .page-head,
-    .dashboard-toolbar {
+    .page-head {
         align-items: stretch;
         flex-direction: column;
     }
 
     .page-head h1 {
         font-size: 1.6rem;
-    }
-
-    .search-field {
-        flex-basis: auto;
-    }
-
-    .updated-text {
-        white-space: normal;
     }
 
     .article-row,
