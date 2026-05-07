@@ -5,17 +5,29 @@
 
 <PageTitle>Conflict Topics</PageTitle>
 
-<section class="page-head">
+<section class="page-head dashboard-head">
     <div>
         <p class="eyebrow">Realtime Wikipedia</p>
-        <h1>Conflict Topics Dashboard</h1>
+        <h1>Conflict Topics</h1>
     </div>
     <span class="live-pill">@_connectionState</span>
+</section>
+
+<section class="dashboard-toolbar">
+    <div class="search-field">
+        <label class="visually-hidden" for="topic-search">Search topics</label>
+        <input id="topic-search" class="form-control" type="search" placeholder="Search topics" @bind="_query" @bind:event="oninput" />
+    </div>
+    <span class="updated-text">@LastUpdatedText</span>
 </section>
 
 @if (_topics is null)
 {
     <div class="empty-state">Loading topics...</div>
+}
+else if (_loadError is not null)
+{
+    <div class="empty-state">@_loadError</div>
 }
 else if (_topics.Count == 0)
 {
@@ -24,7 +36,7 @@ else if (_topics.Count == 0)
 else
 {
     <section class="topic-grid">
-        @foreach (var topic in _topics)
+        @foreach (var topic in FilteredTopics)
         {
             <a class="topic-card" href="@($"/topics/{topic.TopicId}")">
                 <div class="row-split">
@@ -50,15 +62,59 @@ else
             </a>
         }
     </section>
+
+    @if (FilteredTopics.Count == 0)
+    {
+        <div class="empty-state mt-3">No topics match this search.</div>
+    }
 }
 
 @code {
     private List<TopicSnapshotDto>? _topics;
     private string _connectionState = "connecting";
+    private string? _loadError;
+    private string _query = "";
+    private DateTimeOffset? _lastUpdatedAt;
+
+    private IReadOnlyList<TopicSnapshotDto> FilteredTopics
+    {
+        get
+        {
+            if (_topics is null)
+            {
+                return [];
+            }
+
+            if (string.IsNullOrWhiteSpace(_query))
+            {
+                return _topics;
+            }
+
+            return _topics
+                .Where(topic => topic.DisplayName.Contains(_query, StringComparison.CurrentCultureIgnoreCase))
+                .ToList();
+        }
+    }
+
+    private string LastUpdatedText => _lastUpdatedAt is null
+        ? "Updating..."
+        : $"Updated {_lastUpdatedAt.Value.ToLocalTime():HH:mm:ss}";
 
     protected override async Task OnInitializedAsync()
     {
-        _topics = (await Api.GetTopicsAsync()).ToList();
+        try
+        {
+            _topics = (await Api.GetTopicsAsync()).ToList();
+            _lastUpdatedAt = DateTimeOffset.UtcNow;
+        }
+        catch (HttpRequestException)
+        {
+            _topics = [];
+            _connectionState = "offline";
+            _loadError = "Gateway is unavailable. Start the local backend or use the Docker Compose stack, then refresh.";
+            return;
+        }
+
         try
         {
             await Realtime.ConnectAsync(onTopicUpdated: snapshot =>
@@ -89,6 +145,6 @@ else
         }
 
         _topics = _topics.OrderByDescending(t => t.ConflictScore).ToList();
+        _lastUpdatedAt = DateTimeOffset.UtcNow;
     }
 }
-
