@@ -87,6 +87,6 @@ CREATE TABLE IF NOT EXISTS topic_snapshots (
 
 CREATE INDEX IF NOT EXISTS ix_topic_articles_topic_score ON topic_articles (topic_id, relevance_score DESC);
 CREATE INDEX IF NOT EXISTS ix_classified_edits_article ON classified_edits (topic_id, wiki, page_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS ix_classified_edits_topic_time ON classified_edits (topic_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS ix_revert_edges_article ON revert_edges (topic_id, wiki, page_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS ix_article_conflict_snapshots_topic_score ON article_conflict_snapshots (topic_id, conflict_score DESC);
-

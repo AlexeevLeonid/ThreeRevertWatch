@@ -326,6 +326,111 @@ tbody tr:last-child td {
     padding: 1rem;
 }
 
+.activity-panel {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+}
+
+.activity-head {
+    align-items: flex-start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: .75rem;
+}
+
+.activity-head h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.activity-head p {
+    color: #6c757d;
+    font-size: .82rem;
+    margin: .15rem 0 0;
+}
+
+.activity-legend {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-bottom: .25rem;
+}
+
+.activity-legend span {
+    align-items: center;
+    color: #495057;
+    display: inline-flex;
+    font-size: .82rem;
+    gap: .35rem;
+}
+
+.activity-dot {
+    border-radius: 999px;
+    display: inline-block;
+    height: .5rem;
+    width: .5rem;
+}
+
+.activity-dot.edits {
+    background: #0d6efd;
+}
+
+.activity-dot.reverts {
+    background: #dc3545;
+}
+
+.activity-chart {
+    display: block;
+    height: 14rem;
+    overflow: visible;
+    width: 100%;
+}
+
+.activity-grid {
+    stroke: #e9ecef;
+    stroke-width: 1;
+}
+
+.activity-axis {
+    fill: #6c757d;
+    font-size: .72rem;
+}
+
+.activity-line {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.25;
+    vector-effect: non-scaling-stroke;
+}
+
+.activity-line.edits,
+.activity-point.edits {
+    stroke: #0d6efd;
+}
+
+.activity-line.reverts,
+.activity-point.reverts {
+    stroke: #dc3545;
+}
+
+.activity-point {
+    fill: #fff;
+    stroke-width: 1.75;
+    vector-effect: non-scaling-stroke;
+}
+
+.activity-empty {
+    color: #6c757d;
+    padding: 3rem 0;
+    text-align: center;
+}
+
 .pipeline-summary {
     grid-template-columns: repeat(3, minmax(8.5rem, 1fr));
 }
@@ -408,6 +513,15 @@ h1:focus {
     .pipeline-metrics,
     .pipeline-summary {
         grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    }
+
+    .activity-head,
+    .activity-legend {
+        justify-content: flex-start;
+    }
+
+    .activity-head {
+        flex-direction: column;
     }
 
     .cluster-row {

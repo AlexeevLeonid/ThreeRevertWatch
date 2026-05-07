@@ -27,6 +27,8 @@ else
         <MetricBlock Label="Participants" Value="@_topic.RecentParticipantCount.ToString()" />
     </section>
 
+    <HourlyActivityChart Activity="@_activity" />
+
     <section class="toolbar-line">
         <label>
             Sort
@@ -49,6 +51,7 @@ else
     [Parameter] public string TopicId { get; set; } = "";
 
     private TopicSnapshotDto? _topic;
+    private TopicActivityDto? _activity;
     private List<ArticleListItemDto> _articles = [];
     private string _sort = "score";
 
@@ -62,6 +65,7 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _topic = await Api.GetTopicAsync(TopicId);
+        _activity = await Api.GetTopicActivityAsync(TopicId);
         _articles = (await Api.GetArticlesAsync(TopicId)).ToList();
         try
         {
@@ -72,6 +76,7 @@ else
                     {
                         _topic = snapshot;
                         _articles = snapshot.Articles.ToList();
+                        _ = RefreshActivityAsync();
                     }
                     return InvokeAsync(StateHasChanged);
                 },
@@ -109,5 +114,20 @@ else
         {
         }
     }
-}
 
+    private async Task RefreshActivityAsync()
+    {
+        try
+        {
+            var activity = await Api.GetTopicActivityAsync(TopicId);
+            await InvokeAsync(() =>
+            {
+                _activity = activity;
+                StateHasChanged();
+            });
+        }
+        catch
+        {
+        }
+    }
+}

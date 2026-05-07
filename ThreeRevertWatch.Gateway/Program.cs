@@ -48,6 +48,16 @@ try
     app.MapGet("/api/conflicts/topics/{topicId}/articles", async (string topicId, AggregatorProxyClient client, CancellationToken ct) =>
         Results.Ok(await client.GetArticlesAsync(topicId, ct)));
 
+    app.MapGet("/api/conflicts/topics/{topicId}/activity", async (
+        string topicId,
+        int? hours,
+        AggregatorProxyClient client,
+        CancellationToken ct) =>
+    {
+        var activity = await client.GetTopicActivityAsync(topicId, hours ?? 24, ct);
+        return activity is null ? Results.NotFound() : Results.Ok(activity);
+    });
+
     app.MapGet("/api/conflicts/topics/{topicId}/articles/{pageId:long}", async (
         string topicId,
         long pageId,

@@ -194,6 +194,18 @@ public sealed record TopicSnapshotDto(
     IReadOnlyList<string> Evidence,
     DateTimeOffset UpdatedAt);
 
+public sealed record TopicActivityDto(
+    string TopicId,
+    DateTimeOffset From,
+    DateTimeOffset To,
+    IReadOnlyList<TopicHourlyActivityDto> Hours);
+
+public sealed record TopicHourlyActivityDto(
+    DateTimeOffset HourStart,
+    int EditCount,
+    int RevertCount,
+    int ParticipantCount);
+
 public sealed record ArticleConflictUpdateEvent(
     string EventId,
     string TopicId,

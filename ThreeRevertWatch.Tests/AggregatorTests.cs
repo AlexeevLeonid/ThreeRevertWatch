@@ -41,6 +41,18 @@ public sealed class AggregatorTests
         Assert.Equal("Low", topic.Articles[1].Title);
     }
 
+    [Fact]
+    public async Task Topic_activity_groups_recent_edits_by_hour()
+    {
+        var store = new InMemoryConflictReadModelStore();
+        await store.UpsertArticleAsync(Snapshot(1, "Article", 70), CancellationToken.None);
+
+        var activity = await store.GetTopicActivityAsync("topic", 24, CancellationToken.None);
+
+        Assert.Equal(24, activity.Hours.Count);
+        Assert.Contains(activity.Hours, hour => hour.EditCount == 1 && hour.ParticipantCount == 1);
+    }
+
     private static ConflictAggregationService CreateService(IConflictReadModelStore store)
         => new(
             store,
@@ -77,4 +89,3 @@ public sealed class AggregatorTests
             [$"score {score}"],
             DateTimeOffset.UtcNow);
 }
-

@@ -115,6 +115,61 @@ ON CONFLICT (topic_id) DO UPDATE SET
         return result is null ? null : JsonSerializer.Deserialize<TopicSnapshotDto>(result, KafkaJson.Options);
     }
 
+    public async Task<TopicActivityDto> GetTopicActivityAsync(
+        string topicId,
+        int hours,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+SELECT
+    date_trunc('hour', "timestamp") AS hour_start,
+    count(*)::integer AS edit_count,
+    count(*) FILTER (
+        WHERE action_type IN (
+            'ExactRevert',
+            'PartialRevert',
+            'Restoration',
+            'CounterRevert',
+            'SelfRevert',
+            'VandalismCleanup',
+            'SpamCleanup',
+            'CopyvioCleanup'
+        )
+    )::integer AS revert_count,
+    count(DISTINCT user_name)::integer AS participant_count
+FROM classified_edits
+WHERE topic_id = @topic_id
+  AND "timestamp" >= @from
+  AND "timestamp" < @to
+GROUP BY hour_start
+ORDER BY hour_start
+""";
+
+        var (from, to, buckets) = CreateEmptyBuckets(hours);
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("topic_id", topicId);
+        command.Parameters.AddWithValue("from", from);
+        command.Parameters.AddWithValue("to", to);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var hourStart = FloorHour(reader.GetFieldValue<DateTimeOffset>(0));
+            if (!buckets.ContainsKey(hourStart))
+            {
+                continue;
+            }
+
+            buckets[hourStart] = new TopicHourlyActivityDto(
+                hourStart,
+                reader.GetInt32(1),
+                reader.GetInt32(2),
+                reader.GetInt32(3));
+        }
+
+        return new TopicActivityDto(topicId, from, to, buckets.Values.ToList());
+    }
+
     public async Task<IReadOnlyList<ArticleConflictSnapshotDto>> GetArticleSnapshotsAsync(
         string topicId,
         CancellationToken cancellationToken)
@@ -200,4 +255,27 @@ ON CONFLICT (topic_id) DO UPDATE SET
 
     private static string TopicCacheKey(string topicId) => $"conflict-topic:{topicId}";
     private static string ArticleCacheKey(string topicId, long pageId) => $"conflict-article:{topicId}:{pageId}";
+
+    private static (DateTimeOffset From, DateTimeOffset To, SortedDictionary<DateTimeOffset, TopicHourlyActivityDto> Buckets)
+        CreateEmptyBuckets(int hours)
+    {
+        var clampedHours = Math.Clamp(hours, 1, 168);
+        var now = DateTimeOffset.UtcNow;
+        var currentHour = FloorHour(now);
+        var from = currentHour.AddHours(-(clampedHours - 1));
+        var to = now;
+        var buckets = new SortedDictionary<DateTimeOffset, TopicHourlyActivityDto>();
+        for (var hour = from; hour <= currentHour; hour = hour.AddHours(1))
+        {
+            buckets[hour] = new TopicHourlyActivityDto(hour, 0, 0, 0);
+        }
+
+        return (from, to, buckets);
+    }
+
+    private static DateTimeOffset FloorHour(DateTimeOffset value)
+    {
+        var utc = value.ToUniversalTime();
+        return new DateTimeOffset(utc.Year, utc.Month, utc.Day, utc.Hour, 0, 0, TimeSpan.Zero);
+    }
 }

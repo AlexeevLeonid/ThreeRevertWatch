@@ -87,6 +87,21 @@ try
                 a.RecentEdits.FirstOrDefault()?.Timestamp ?? a.UpdatedAt)));
     });
 
+    app.MapGet("/api/conflicts/topics/{topicId}/activity", async (
+        string topicId,
+        int? hours,
+        IConflictReadModelStore store,
+        IOptions<ConflictTopicsCatalogOptions> options,
+        CancellationToken ct) =>
+    {
+        if (!IsTrackedTopic(topicId, options.Value))
+        {
+            return Results.NotFound();
+        }
+
+        return Results.Ok(await store.GetTopicActivityAsync(topicId, hours ?? 24, ct));
+    });
+
     app.MapGet("/api/conflicts/topics/{topicId}/articles/{pageId:long}", async (
         string topicId,
         long pageId,

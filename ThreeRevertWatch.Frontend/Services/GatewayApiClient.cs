@@ -20,6 +20,9 @@ public sealed class GatewayApiClient
     public async Task<IReadOnlyList<ArticleListItemDto>> GetArticlesAsync(string topicId, CancellationToken cancellationToken = default)
         => await _httpClient.GetFromJsonAsync<IReadOnlyList<ArticleListItemDto>>($"/api/conflicts/topics/{Uri.EscapeDataString(topicId)}/articles", cancellationToken) ?? [];
 
+    public Task<TopicActivityDto?> GetTopicActivityAsync(string topicId, int hours = 24, CancellationToken cancellationToken = default)
+        => _httpClient.GetFromJsonAsync<TopicActivityDto>($"/api/conflicts/topics/{Uri.EscapeDataString(topicId)}/activity?hours={hours}", cancellationToken);
+
     public Task<ArticleConflictSnapshotDto?> GetArticleAsync(string topicId, long pageId, CancellationToken cancellationToken = default)
         => _httpClient.GetFromJsonAsync<ArticleConflictSnapshotDto>($"/api/conflicts/topics/{Uri.EscapeDataString(topicId)}/articles/{pageId}", cancellationToken);
 

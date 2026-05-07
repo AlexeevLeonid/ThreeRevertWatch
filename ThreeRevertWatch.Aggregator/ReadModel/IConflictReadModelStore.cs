@@ -12,6 +12,11 @@ public interface IConflictReadModelStore
 
     Task<TopicSnapshotDto?> GetTopicAsync(string topicId, CancellationToken cancellationToken);
 
+    Task<TopicActivityDto> GetTopicActivityAsync(
+        string topicId,
+        int hours,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<ArticleConflictSnapshotDto>> GetArticleSnapshotsAsync(
         string topicId,
         CancellationToken cancellationToken);
@@ -21,4 +26,3 @@ public interface IConflictReadModelStore
         long pageId,
         CancellationToken cancellationToken);
 }
-

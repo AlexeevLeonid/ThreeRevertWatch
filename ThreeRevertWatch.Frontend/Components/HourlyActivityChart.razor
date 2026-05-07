@@ -1,0 +1,131 @@
+@using System.Globalization
+
+<section class="activity-panel">
+    <div class="activity-head">
+        <div>
+            <h2>Edits over 24 hours</h2>
+            <p>Hourly activity for this conflict topic</p>
+        </div>
+        @if (Activity is not null)
+        {
+            <span class="muted">Updated @Activity.To.ToLocalTime().ToString("HH:mm")</span>
+        }
+    </div>
+
+    @if (Activity is null)
+    {
+        <div class="activity-empty">Loading activity...</div>
+    }
+    else if (Activity.Hours.Count == 0)
+    {
+        <div class="activity-empty">No activity data yet.</div>
+    }
+    else
+    {
+        <div class="activity-legend" aria-hidden="true">
+            <span><i class="activity-dot edits"></i> Edits</span>
+            <span><i class="activity-dot reverts"></i> Reverts</span>
+        </div>
+        <svg class="activity-chart" viewBox="0 0 720 220" role="img" aria-label="Hourly edit and revert activity over the last 24 hours" preserveAspectRatio="none">
+            @foreach (var y in GridY)
+            {
+                <line class="activity-grid" x1="@Left" y1="@Format(y)" x2="@Right" y2="@Format(y)" />
+            }
+
+            @foreach (var label in AxisLabels)
+            {
+                @AxisLabelMarkup(label)
+            }
+
+            <polyline class="activity-line edits" points="@EditPoints" />
+            <polyline class="activity-line reverts" points="@RevertPoints" />
+
+            @foreach (var point in Points)
+            {
+                <circle class="activity-point edits" cx="@Format(point.X)" cy="@Format(point.EditY)" r="3">
+                    <title>@($"{point.Label}: {point.Hour.EditCount} edits")</title>
+                </circle>
+                <circle class="activity-point reverts" cx="@Format(point.X)" cy="@Format(point.RevertY)" r="2.5">
+                    <title>@($"{point.Label}: {point.Hour.RevertCount} reverts")</title>
+                </circle>
+            }
+        </svg>
+    }
+</section>
+
+@code {
+    private const double Left = 38;
+    private const double Right = 706;
+    private const double Top = 18;
+    private const double Bottom = 188;
+
+    [Parameter] public TopicActivityDto? Activity { get; set; }
+
+    private IReadOnlyList<TopicHourlyActivityDto> Hours => Activity?.Hours ?? [];
+
+    private int MaxValue => Math.Max(1, Hours.SelectMany(h => new[] { h.EditCount, h.RevertCount }).DefaultIfEmpty(0).Max());
+
+    private IEnumerable<double> GridY => Enumerable.Range(0, 4).Select(i => Top + (Bottom - Top) * i / 3);
+
+    private IReadOnlyList<ActivityPoint> Points => Hours
+        .Select((hour, index) =>
+        {
+            var x = GetX(index);
+            return new ActivityPoint(
+                hour,
+                x,
+                GetY(hour.EditCount),
+                GetY(hour.RevertCount),
+                hour.HourStart.ToLocalTime().ToString("HH:mm"));
+        })
+        .ToList();
+
+    private string EditPoints => string.Join(" ", Points.Select(p => $"{Format(p.X)},{Format(p.EditY)}"));
+
+    private string RevertPoints => string.Join(" ", Points.Select(p => $"{Format(p.X)},{Format(p.RevertY)}"));
+
+    private IReadOnlyList<AxisLabel> AxisLabels
+    {
+        get
+        {
+            if (Hours.Count == 0)
+            {
+                return [];
+            }
+
+            var indexes = new SortedSet<int> { 0, Hours.Count - 1 };
+            for (var index = 6; index < Hours.Count - 1; index += 6)
+            {
+                indexes.Add(index);
+            }
+
+            return indexes
+                .Select(index => new AxisLabel(
+                    index,
+                    Hours[index].HourStart.ToLocalTime().ToString("HH:mm"),
+                    index == 0 ? "start" : index == Hours.Count - 1 ? "end" : "middle"))
+                .ToList();
+        }
+    }
+
+    private double GetX(int index)
+        => Hours.Count <= 1 ? Left : Left + (Right - Left) * index / (Hours.Count - 1);
+
+    private double GetY(int value)
+        => Bottom - (Bottom - Top) * value / MaxValue;
+
+    private static string Format(double value)
+        => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private MarkupString AxisLabelMarkup(AxisLabel label)
+        => (MarkupString)$"""<text class="activity-axis" x="{Format(GetX(label.Index))}" y="214" text-anchor="{label.Anchor}">{label.Text}</text>""";
+
+    private sealed record ActivityPoint(
+        TopicHourlyActivityDto Hour,
+        double X,
+        double EditY,
+        double RevertY,
+        string Label);
+
+    private sealed record AxisLabel(int Index, string Text, string Anchor);
+}
