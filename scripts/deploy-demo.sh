@@ -47,7 +47,11 @@ for service in "${BUILD_SERVICES[@]}"; do
   "${COMPOSE[@]}" -f docker-compose.yml -f docker-compose.demo.yml build "$service"
 done
 
-"${COMPOSE[@]}" -f docker-compose.yml -f docker-compose.demo.yml up -d --remove-orphans
+if ! "${COMPOSE[@]}" -f docker-compose.yml -f docker-compose.demo.yml up -d --remove-orphans; then
+  echo "Full compose up failed; retrying application services without dependency gate." >&2
+  "${COMPOSE[@]}" -f docker-compose.yml -f docker-compose.demo.yml up -d --no-build --no-deps \
+    aggregator collector topicmatcher conflictdetector gateway frontend reverse-proxy
+fi
 "${COMPOSE[@]}" -f docker-compose.yml -f docker-compose.demo.yml ps
 
 docker builder prune -af >/dev/null || true
