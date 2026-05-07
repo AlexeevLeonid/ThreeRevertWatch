@@ -17,6 +17,11 @@ else
   exit 1
 fi
 
+# Docker/Compose v5 routes builds through buildx on the demo VPS, and that path
+# can stall for a long time there. The legacy builder is noisy but predictable
+# for these small single-platform images.
+export DOCKER_BUILDKIT=0
+
 echo "Deploying branch ${DEPLOY_BRANCH} in $(pwd)"
 git fetch --prune origin
 if git show-ref --verify --quiet "refs/heads/${DEPLOY_BRANCH}"; then
