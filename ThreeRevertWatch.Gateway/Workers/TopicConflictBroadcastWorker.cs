@@ -28,8 +28,10 @@ public sealed class TopicConflictBroadcastWorker : BackgroundService
 
     private async Task HandleAsync(TopicConflictUpdateEvent update, CancellationToken cancellationToken)
     {
-        await _hub.Clients.Group("conflict-topics").TopicSnapshotUpdated(update.Snapshot);
-        await _hub.Clients.Group($"conflict-topic:{update.Snapshot.TopicId}").TopicSnapshotUpdated(update.Snapshot);
+        await _hub.Clients.Group("conflict-topics").TopicSnapshotUpdated(CompactTopic(update.Snapshot, 4));
+        await _hub.Clients.Group($"conflict-topic:{update.Snapshot.TopicId}").TopicSnapshotUpdated(CompactTopic(update.Snapshot, 0));
     }
-}
 
+    private static TopicSnapshotDto CompactTopic(TopicSnapshotDto topic, int articleLimit)
+        => topic with { Articles = topic.Articles.Take(articleLimit).ToList() };
+}

@@ -41,7 +41,9 @@ try
             .Select(t => t.Id)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var topics = await store.GetTopicsAsync(ct);
-        return Results.Ok(topics.Where(topic => topicIds.Contains(topic.TopicId)));
+        return Results.Ok(topics
+            .Where(topic => topicIds.Contains(topic.TopicId))
+            .Select(topic => CompactTopic(topic, 4)));
     });
 
     app.MapGet("/api/conflicts/topics/{topicId}", async (
@@ -56,7 +58,7 @@ try
         }
 
         var topic = await store.GetTopicAsync(topicId, ct);
-        return topic is null ? Results.NotFound() : Results.Ok(topic);
+        return topic is null ? Results.NotFound() : Results.Ok(CompactTopic(topic, 0));
     });
 
     app.MapGet("/api/conflicts/topics/{topicId}/articles", async (
@@ -166,3 +168,8 @@ finally
 
 static bool IsTrackedTopic(string topicId, ConflictTopicsCatalogOptions options)
     => options.Topics.Any(topic => string.Equals(topic.Id, topicId, StringComparison.OrdinalIgnoreCase));
+
+static ThreeRevertWatch.Contracts.TopicSnapshotDto CompactTopic(
+    ThreeRevertWatch.Contracts.TopicSnapshotDto topic,
+    int articleLimit)
+    => topic with { Articles = topic.Articles.Take(articleLimit).ToList() };

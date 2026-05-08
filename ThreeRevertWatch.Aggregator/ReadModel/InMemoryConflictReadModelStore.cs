@@ -22,12 +22,16 @@ public sealed class InMemoryConflictReadModelStore : IConflictReadModelStore
 
     public Task<IReadOnlyList<TopicSnapshotDto>> GetTopicsAsync(CancellationToken cancellationToken)
         => Task.FromResult<IReadOnlyList<TopicSnapshotDto>>(
-            _topics.Values.OrderByDescending(t => t.ConflictScore).ThenBy(t => t.DisplayName).ToList());
+            _topics.Values
+                .OrderByDescending(t => t.ConflictScore)
+                .ThenBy(t => t.DisplayName)
+                .Select(t => CompactTopic(t, 4))
+                .ToList());
 
     public Task<TopicSnapshotDto?> GetTopicAsync(string topicId, CancellationToken cancellationToken)
     {
         _topics.TryGetValue(topicId, out var topic);
-        return Task.FromResult(topic);
+        return Task.FromResult(topic is null ? null : CompactTopic(topic, 0));
     }
 
     public Task<TopicActivityDto> GetTopicActivityAsync(
@@ -78,6 +82,9 @@ public sealed class InMemoryConflictReadModelStore : IConflictReadModelStore
     }
 
     private static string ArticleKey(string topicId, long pageId) => $"{topicId}:{pageId}";
+
+    private static TopicSnapshotDto CompactTopic(TopicSnapshotDto topic, int articleLimit)
+        => topic with { Articles = topic.Articles.Take(articleLimit).ToList() };
 
     private static (DateTimeOffset From, DateTimeOffset To, SortedDictionary<DateTimeOffset, TopicHourlyActivityDto> Buckets)
         CreateEmptyBuckets(string topicId, int hours)

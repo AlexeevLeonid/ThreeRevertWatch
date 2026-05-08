@@ -75,7 +75,10 @@ else
                     if (snapshot.TopicId == TopicId)
                     {
                         _topic = snapshot;
-                        _articles = snapshot.Articles.ToList();
+                        if (snapshot.Articles.Count > 0)
+                        {
+                            _articles = snapshot.Articles.ToList();
+                        }
                         _ = RefreshActivityAsync();
                     }
                     return InvokeAsync(StateHasChanged);

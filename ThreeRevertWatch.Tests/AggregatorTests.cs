@@ -53,6 +53,19 @@ public sealed class AggregatorTests
         Assert.Contains(activity.Hours, hour => hour.EditCount == 1 && hour.ParticipantCount == 1);
     }
 
+    [Fact]
+    public async Task Topic_list_keeps_only_preview_articles()
+    {
+        var store = new InMemoryConflictReadModelStore();
+        await store.UpsertTopicAsync(TopicWithArticles(6), CancellationToken.None);
+
+        var topics = await store.GetTopicsAsync(CancellationToken.None);
+        var topic = await store.GetTopicAsync("topic", CancellationToken.None);
+
+        Assert.Equal(4, topics.Single().Articles.Count);
+        Assert.Empty(topic!.Articles);
+    }
+
     private static ConflictAggregationService CreateService(IConflictReadModelStore store)
         => new(
             store,
@@ -87,5 +100,32 @@ public sealed class AggregatorTests
             [],
             [],
             [$"score {score}"],
+            DateTimeOffset.UtcNow);
+
+    private static TopicSnapshotDto TopicWithArticles(int count)
+        => new(
+            "topic",
+            "Conflict Topic",
+            50,
+            TopicConflictStatus.Watching,
+            count,
+            count,
+            0,
+            count,
+            Enumerable.Range(1, count)
+                .Select(i => new ArticleListItemDto(
+                    "topic",
+                    "ruwiki",
+                    i,
+                    $"Article {i}",
+                    .95,
+                    50,
+                    1,
+                    0,
+                    1,
+                    ArticleConflictStatus.Active,
+                    DateTimeOffset.UtcNow))
+                .ToList(),
+            [],
             DateTimeOffset.UtcNow);
 }

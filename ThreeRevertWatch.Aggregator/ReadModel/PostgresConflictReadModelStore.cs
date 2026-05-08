@@ -77,12 +77,27 @@ ON CONFLICT (topic_id) DO UPDATE SET
         command.Parameters.AddWithValue("snapshot_json", JsonSerializer.Serialize(snapshot, KafkaJson.Options));
         command.Parameters.AddWithValue("updated_at", snapshot.UpdatedAt);
         await command.ExecuteNonQueryAsync(cancellationToken);
-        await CacheSetAsync(TopicCacheKey(snapshot.TopicId), snapshot, cancellationToken);
+        await CacheSetAsync(TopicCacheKey(snapshot.TopicId), CompactTopic(snapshot, 0), cancellationToken);
     }
 
     public async Task<IReadOnlyList<TopicSnapshotDto>> GetTopicsAsync(CancellationToken cancellationToken)
     {
-        const string sql = "SELECT snapshot_json FROM topic_snapshots ORDER BY conflict_score DESC, updated_at DESC";
+        const string sql = """
+SELECT jsonb_set(
+    snapshot_json - 'articles',
+    '{articles}',
+    COALESCE((
+        SELECT jsonb_agg(article)
+        FROM (
+            SELECT article
+            FROM jsonb_array_elements(snapshot_json->'articles') WITH ORDINALITY AS articles(article, ordinal)
+            WHERE ordinal <= 4
+        ) top_articles
+    ), '[]'::jsonb)
+)::text
+FROM topic_snapshots
+ORDER BY conflict_score DESC, updated_at DESC
+""";
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -107,7 +122,11 @@ ON CONFLICT (topic_id) DO UPDATE SET
             return cached;
         }
 
-        const string sql = "SELECT snapshot_json FROM topic_snapshots WHERE topic_id = @topic_id";
+        const string sql = """
+SELECT jsonb_set(snapshot_json - 'articles', '{articles}', '[]'::jsonb)::text
+FROM topic_snapshots
+WHERE topic_id = @topic_id
+""";
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.AddWithValue("topic_id", topicId);
@@ -255,6 +274,9 @@ ORDER BY hour_start
 
     private static string TopicCacheKey(string topicId) => $"conflict-topic:{topicId}";
     private static string ArticleCacheKey(string topicId, long pageId) => $"conflict-article:{topicId}:{pageId}";
+
+    private static TopicSnapshotDto CompactTopic(TopicSnapshotDto topic, int articleLimit)
+        => topic with { Articles = topic.Articles.Take(articleLimit).ToList() };
 
     private static (DateTimeOffset From, DateTimeOffset To, SortedDictionary<DateTimeOffset, TopicHourlyActivityDto> Buckets)
         CreateEmptyBuckets(int hours)
