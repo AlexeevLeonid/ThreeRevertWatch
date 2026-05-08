@@ -45,8 +45,12 @@ try
         return topic is null ? Results.NotFound() : Results.Ok(topic);
     });
 
-    app.MapGet("/api/conflicts/topics/{topicId}/articles", async (string topicId, AggregatorProxyClient client, CancellationToken ct) =>
-        Results.Ok(await client.GetArticlesAsync(topicId, ct)));
+    app.MapGet("/api/conflicts/topics/{topicId}/articles", async (
+        string topicId,
+        int? limit,
+        AggregatorProxyClient client,
+        CancellationToken ct) =>
+        Results.Ok(await client.GetArticlesAsync(topicId, limit, ct)));
 
     app.MapGet("/api/conflicts/topics/{topicId}/activity", async (
         string topicId,

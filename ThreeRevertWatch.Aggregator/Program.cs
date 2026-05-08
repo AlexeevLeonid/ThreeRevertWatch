@@ -63,6 +63,7 @@ try
 
     app.MapGet("/api/conflicts/topics/{topicId}/articles", async (
         string topicId,
+        int? limit,
         IConflictReadModelStore store,
         IOptions<ConflictTopicsCatalogOptions> options,
         CancellationToken ct) =>
@@ -72,7 +73,7 @@ try
             return Results.NotFound();
         }
 
-        var articles = await store.GetArticleSnapshotsAsync(topicId, ct);
+        var articles = await store.GetArticleSnapshotsAsync(topicId, ct, ClampLimit(limit));
         return Results.Ok(articles
             .OrderByDescending(a => a.ConflictScore)
             .Select(a => new ThreeRevertWatch.Contracts.ArticleListItemDto(
@@ -173,3 +174,6 @@ static ThreeRevertWatch.Contracts.TopicSnapshotDto CompactTopic(
     ThreeRevertWatch.Contracts.TopicSnapshotDto topic,
     int articleLimit)
     => topic with { Articles = topic.Articles.Take(articleLimit).ToList() };
+
+static int? ClampLimit(int? limit)
+    => limit is null ? null : Math.Clamp(limit.Value, 1, 500);

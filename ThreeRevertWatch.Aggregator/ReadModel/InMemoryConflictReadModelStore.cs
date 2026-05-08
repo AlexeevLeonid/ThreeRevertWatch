@@ -65,11 +65,13 @@ public sealed class InMemoryConflictReadModelStore : IConflictReadModelStore
 
     public Task<IReadOnlyList<ArticleConflictSnapshotDto>> GetArticleSnapshotsAsync(
         string topicId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? limit = null)
         => Task.FromResult<IReadOnlyList<ArticleConflictSnapshotDto>>(
             _articles.Values
                 .Where(a => string.Equals(a.TopicId, topicId, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(a => a.ConflictScore)
+                .Take(limit ?? int.MaxValue)
                 .ToList());
 
     public Task<ArticleConflictSnapshotDto?> GetArticleSnapshotAsync(

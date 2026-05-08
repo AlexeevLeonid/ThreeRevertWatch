@@ -19,7 +19,8 @@ public interface IConflictReadModelStore
 
     Task<IReadOnlyList<ArticleConflictSnapshotDto>> GetArticleSnapshotsAsync(
         string topicId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        int? limit = null);
 
     Task<ArticleConflictSnapshotDto?> GetArticleSnapshotAsync(
         string topicId,

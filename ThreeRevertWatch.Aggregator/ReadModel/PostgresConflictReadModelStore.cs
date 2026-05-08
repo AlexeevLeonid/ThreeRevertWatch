@@ -191,12 +191,20 @@ ORDER BY hour_start
 
     public async Task<IReadOnlyList<ArticleConflictSnapshotDto>> GetArticleSnapshotsAsync(
         string topicId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? limit = null)
     {
-        const string sql = "SELECT snapshot_json FROM article_conflict_snapshots WHERE topic_id = @topic_id ORDER BY conflict_score DESC, updated_at DESC";
+        const string sql = """
+SELECT snapshot_json
+FROM article_conflict_snapshots
+WHERE topic_id = @topic_id
+ORDER BY conflict_score DESC, updated_at DESC
+LIMIT @limit
+""";
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.AddWithValue("topic_id", topicId);
+        command.Parameters.AddWithValue("limit", limit ?? int.MaxValue);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var articles = new List<ArticleConflictSnapshotDto>();
         while (await reader.ReadAsync(cancellationToken))

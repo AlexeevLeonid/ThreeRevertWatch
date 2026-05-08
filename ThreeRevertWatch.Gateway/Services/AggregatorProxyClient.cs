@@ -17,8 +17,19 @@ public sealed class AggregatorProxyClient
     public Task<TopicSnapshotDto?> GetTopicAsync(string topicId, CancellationToken cancellationToken)
         => GetOrNullAsync<TopicSnapshotDto>($"/api/conflicts/topics/{Uri.EscapeDataString(topicId)}", cancellationToken);
 
-    public async Task<IReadOnlyList<ArticleListItemDto>> GetArticlesAsync(string topicId, CancellationToken cancellationToken)
-        => await _httpClient.GetFromJsonAsync<IReadOnlyList<ArticleListItemDto>>($"/api/conflicts/topics/{Uri.EscapeDataString(topicId)}/articles", cancellationToken) ?? [];
+    public async Task<IReadOnlyList<ArticleListItemDto>> GetArticlesAsync(
+        string topicId,
+        int? limit,
+        CancellationToken cancellationToken)
+    {
+        var path = $"/api/conflicts/topics/{Uri.EscapeDataString(topicId)}/articles";
+        if (limit is not null)
+        {
+            path += $"?limit={limit.Value}";
+        }
+
+        return await _httpClient.GetFromJsonAsync<IReadOnlyList<ArticleListItemDto>>(path, cancellationToken) ?? [];
+    }
 
     public Task<TopicActivityDto?> GetTopicActivityAsync(string topicId, int hours, CancellationToken cancellationToken)
         => GetOrNullAsync<TopicActivityDto>($"/api/conflicts/topics/{Uri.EscapeDataString(topicId)}/activity?hours={hours}", cancellationToken);
