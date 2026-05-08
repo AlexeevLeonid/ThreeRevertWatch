@@ -384,10 +384,18 @@ tbody tr:last-child td {
     background: #dc3545;
 }
 
-.activity-chart {
-    display: block;
+.activity-chart-frame {
     height: 14rem;
+    position: relative;
+    width: 100%;
+}
+
+.activity-chart {
+    inset: 0;
+    display: block;
+    height: 100%;
     overflow: visible;
+    position: absolute;
     width: 100%;
 }
 
@@ -397,8 +405,21 @@ tbody tr:last-child td {
 }
 
 .activity-axis {
-    fill: #6c757d;
+    bottom: .1rem;
+    color: #6c757d;
     font-size: .72rem;
+    line-height: 1;
+    position: absolute;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+.activity-axis.start {
+    transform: translateX(0);
+}
+
+.activity-axis.end {
+    transform: translateX(-100%);
 }
 
 .activity-line {
@@ -409,20 +430,31 @@ tbody tr:last-child td {
     vector-effect: non-scaling-stroke;
 }
 
-.activity-line.edits,
-.activity-point.edits {
+.activity-line.edits {
     stroke: #0d6efd;
 }
 
-.activity-line.reverts,
-.activity-point.reverts {
+.activity-line.reverts {
     stroke: #dc3545;
 }
 
-.activity-point {
-    fill: #fff;
-    stroke-width: 1.75;
-    vector-effect: non-scaling-stroke;
+.activity-marker {
+    border-radius: 999px;
+    display: block;
+    height: .42rem;
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: .42rem;
+}
+
+.activity-marker.edits {
+    background: #0d6efd;
+}
+
+.activity-marker.reverts {
+    background: #dc3545;
+    height: .35rem;
+    width: .35rem;
 }
 
 .activity-empty {

@@ -26,34 +26,38 @@
             <span><i class="activity-dot edits"></i> Edits</span>
             <span><i class="activity-dot reverts"></i> Reverts</span>
         </div>
-        <svg class="activity-chart" viewBox="0 0 720 220" role="img" aria-label="Hourly edit and revert activity over the last 24 hours" preserveAspectRatio="none">
-            @foreach (var y in GridY)
+        <div class="activity-chart-frame" role="img" aria-label="Hourly edit and revert activity over the last 24 hours">
+            <svg class="activity-chart" viewBox="0 0 720 220" aria-hidden="true" preserveAspectRatio="none">
+                @foreach (var y in GridY)
+                {
+                    <line class="activity-grid" x1="@Left" y1="@Format(y)" x2="@Right" y2="@Format(y)" />
+                }
+
+                <polyline class="activity-line edits" points="@EditPoints" />
+                <polyline class="activity-line reverts" points="@RevertPoints" />
+            </svg>
+
+            @foreach (var point in Points)
             {
-                <line class="activity-grid" x1="@Left" y1="@Format(y)" x2="@Right" y2="@Format(y)" />
+                <i class="activity-marker edits"
+                   style="@PointStyle(point.XPercent, point.EditYPercent)"
+                   title="@($"{point.Label}: {point.Hour.EditCount} edits")"></i>
+                <i class="activity-marker reverts"
+                   style="@PointStyle(point.XPercent, point.RevertYPercent)"
+                   title="@($"{point.Label}: {point.Hour.RevertCount} reverts")"></i>
             }
 
             @foreach (var label in AxisLabels)
             {
-                @AxisLabelMarkup(label)
+                <span class="@($"activity-axis {label.Anchor}")" style="@LabelStyle(label.XPercent)">@label.Text</span>
             }
-
-            <polyline class="activity-line edits" points="@EditPoints" />
-            <polyline class="activity-line reverts" points="@RevertPoints" />
-
-            @foreach (var point in Points)
-            {
-                <circle class="activity-point edits" cx="@Format(point.X)" cy="@Format(point.EditY)" r="3">
-                    <title>@($"{point.Label}: {point.Hour.EditCount} edits")</title>
-                </circle>
-                <circle class="activity-point reverts" cx="@Format(point.X)" cy="@Format(point.RevertY)" r="2.5">
-                    <title>@($"{point.Label}: {point.Hour.RevertCount} reverts")</title>
-                </circle>
-            }
-        </svg>
+        </div>
     }
 </section>
 
 @code {
+    private const double ViewWidth = 720;
+    private const double ViewHeight = 220;
     private const double Left = 38;
     private const double Right = 706;
     private const double Top = 18;
@@ -76,6 +80,9 @@
                 x,
                 GetY(hour.EditCount),
                 GetY(hour.RevertCount),
+                ToPercent(x, ViewWidth),
+                ToPercent(GetY(hour.EditCount), ViewHeight),
+                ToPercent(GetY(hour.RevertCount), ViewHeight),
                 hour.HourStart.ToLocalTime().ToString("HH:mm"));
         })
         .ToList();
@@ -103,6 +110,7 @@
                 .Select(index => new AxisLabel(
                     index,
                     Hours[index].HourStart.ToLocalTime().ToString("HH:mm"),
+                    ToPercent(GetX(index), ViewWidth),
                     index == 0 ? "start" : index == Hours.Count - 1 ? "end" : "middle"))
                 .ToList();
         }
@@ -117,15 +125,24 @@
     private static string Format(double value)
         => value.ToString("0.##", CultureInfo.InvariantCulture);
 
-    private MarkupString AxisLabelMarkup(AxisLabel label)
-        => (MarkupString)$"""<text class="activity-axis" x="{Format(GetX(label.Index))}" y="214" text-anchor="{label.Anchor}">{label.Text}</text>""";
+    private static double ToPercent(double value, double max)
+        => value / max * 100;
+
+    private static string PointStyle(double x, double y)
+        => $"left: {Format(x)}%; top: {Format(y)}%;";
+
+    private static string LabelStyle(double x)
+        => $"left: {Format(x)}%;";
 
     private sealed record ActivityPoint(
         TopicHourlyActivityDto Hour,
         double X,
         double EditY,
         double RevertY,
+        double XPercent,
+        double EditYPercent,
+        double RevertYPercent,
         string Label);
 
-    private sealed record AxisLabel(int Index, string Text, string Anchor);
+    private sealed record AxisLabel(int Index, string Text, double XPercent, string Anchor);
 }
