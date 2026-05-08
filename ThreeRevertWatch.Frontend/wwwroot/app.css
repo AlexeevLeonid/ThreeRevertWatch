@@ -215,6 +215,32 @@ select {
     margin-top: 1.25rem;
 }
 
+.load-more-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.load-more-button {
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: .375rem;
+    color: #212529;
+    font-weight: 600;
+    min-width: 8rem;
+    padding: .5rem .85rem;
+}
+
+.load-more-button:hover:not(:disabled) {
+    border-color: #adb5bd;
+    box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .04);
+}
+
+.load-more-button:disabled {
+    color: #6c757d;
+    cursor: default;
+}
+
 .article-table,
 .data-list,
 .edge-list {

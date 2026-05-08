@@ -32,7 +32,7 @@ else
     <section class="toolbar-line">
         <label>
             Sort
-            <select @bind="_sort">
+            <select @bind="_sort" @bind:after="SortChanged">
                 <option value="score">Conflict score</option>
                 <option value="last">Last edit</option>
                 <option value="reverts">Revert count</option>
@@ -40,11 +40,15 @@ else
         </label>
     </section>
 
-    <ArticleGroup Title="Hot now" Articles="@SortedArticles.Where(a => a.ConflictScore >= 60).ToList()" />
-    <ArticleGroup Title="Edit war candidates" Articles="@SortedArticles.Where(a => a.Status is ArticleConflictStatus.EditWarCandidate or ArticleConflictStatus.ThreeRevertRisk or ArticleConflictStatus.HighRisk).ToList()" />
-    <ArticleGroup Title="Watching" Articles="@SortedArticles.Where(a => a.ConflictScore < 60 && a.ConflictScore >= 20).ToList()" />
-    <ArticleGroup Title="Core articles" Articles="@SortedArticles.Where(a => a.RelevanceScore >= .9).ToList()" />
-    <ArticleGroup Title="Candidate articles" Articles="@SortedArticles.Where(a => a.RelevanceScore < .9).ToList()" />
+    <ArticleGroup Title="Articles" Articles="@SortedArticles" />
+    @if (_hasMoreArticles)
+    {
+        <div class="load-more-row">
+            <button class="load-more-button" type="button" disabled="@_isLoadingArticles" @onclick="ShowMoreAsync">
+                @(_isLoadingArticles ? "Loading..." : "Show more")
+            </button>
+        </div>
+    }
 }
 
 @code {
@@ -53,6 +57,10 @@ else
     private TopicSnapshotDto? _topic;
     private TopicActivityDto? _activity;
     private List<ArticleListItemDto> _articles = [];
+    private const int ArticlePageSize = 20;
+    private int _articleLimit = ArticlePageSize;
+    private bool _hasMoreArticles = true;
+    private bool _isLoadingArticles;
     private string _sort = "score";
 
     private IReadOnlyList<ArticleListItemDto> SortedArticles => _sort switch
@@ -66,7 +74,8 @@ else
     {
         _topic = await Api.GetTopicAsync(TopicId);
         _activity = await Api.GetTopicActivityAsync(TopicId);
-        _articles = (await Api.GetArticlesAsync(TopicId, limit: 80)).ToList();
+        _articleLimit = ArticlePageSize;
+        await LoadArticlesAsync();
         try
         {
             await Realtime.ConnectAsync(
@@ -115,6 +124,38 @@ else
         }
         catch
         {
+        }
+    }
+
+    private async Task SortChanged()
+    {
+        _articles = SortedArticles.ToList();
+        await Task.CompletedTask;
+    }
+
+    private async Task ShowMoreAsync()
+    {
+        if (_isLoadingArticles)
+        {
+            return;
+        }
+
+        _articleLimit += ArticlePageSize;
+        await LoadArticlesAsync();
+    }
+
+    private async Task LoadArticlesAsync()
+    {
+        _isLoadingArticles = true;
+        try
+        {
+            var articles = (await Api.GetArticlesAsync(TopicId, limit: _articleLimit + 1)).ToList();
+            _hasMoreArticles = articles.Count > _articleLimit;
+            _articles = articles.Take(_articleLimit).ToList();
+        }
+        finally
+        {
+            _isLoadingArticles = false;
         }
     }
 
