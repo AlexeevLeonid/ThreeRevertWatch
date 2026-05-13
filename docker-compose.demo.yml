@@ -60,7 +60,7 @@ services:
     logging: *demo-logging
 
   topicmatcher:
-    mem_limit: ${DEMO_DOTNET_WORKER_MEM_LIMIT:-256m}
+    mem_limit: ${DEMO_TOPICMATCHER_MEM_LIMIT:-384m}
     depends_on:
       kafka-init:
         condition: service_completed_successfully
@@ -68,6 +68,9 @@ services:
         condition: service_healthy
       db-init:
         condition: service_completed_successfully
+    environment:
+      PageMetadata__Enabled: "false"
+      Serilog__MinimumLevel__Default: Warning
     logging: *demo-logging
 
   conflictdetector:
